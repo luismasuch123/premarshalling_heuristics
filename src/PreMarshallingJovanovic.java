@@ -42,6 +42,18 @@ public class PreMarshallingJovanovic {
                 }
             }
         }
+        //check if blocks are well located or not (1:well located, 0: not well located)
+        for(int s = 0; s < stacks; s++) {
+            for(int t = 0; t < tiers; t++) {
+                if (t == 0) {
+                    current_bay[s][t][2] = 1;
+                } else if(current_bay[s][t][1] > current_bay[s][t-1][1] || current_bay[s][t-1][2] == 0) {
+                    current_bay[s][t][2] = 0;
+                } else if(current_bay[s][t][1] <= current_bay[s][t-1][1] && current_bay[s][t-1][2] == 1) {
+                    current_bay[s][t][2] = 1;
+                }
+            }
+        }
         boolean sorted = false; //TODO: Möglichkeit, dass bereits geordnet ist einbauen?
         int relocations = 0;
         int distance_relocations [] = new int [3]; //tiers, stacks, (bays)
@@ -60,18 +72,6 @@ public class PreMarshallingJovanovic {
                 }
             }
 
-            //check if blocks are well located or not (1:well located, 0: not well located)
-            for(int s = 0; s < stacks; s++) {
-                for(int t = 0; t < tiers; t++) {
-                    if (t == 0) {
-                        current_bay[s][t][2] = 1;
-                    } else if(current_bay[s][t][1] > current_bay[s][t-1][1] || current_bay[s][t-1][2] == 0) {
-                        current_bay[s][t][2] = 0;
-                    } else if(current_bay[s][t][1] <= current_bay[s][t-1][1] && current_bay[s][t-1][2] == 1) {
-                        current_bay[s][t][2] = 1;
-                    }
-                }
-            }
             int s_info [][] = new int [stacks][2]; //highest tier, ordered
             int c_info [][] = new int[containers][4]; //stack, tier, prio, sorted
             int bay_info [][] = new int [3][2]; //1st/2nd and 3rd highest top stack due date value of not well located stacks (prio and stack) or 0 if stack is well located
@@ -83,19 +83,19 @@ public class PreMarshallingJovanovic {
                 boolean highest_tier_found = false;
                 boolean tier_ordered = true;
                 for (int t = tiers-1; t >= 0; t--) {
-                    if (current_bay[s][t][0] != 0) {
-                        c_info[current_bay[s][t][0]-1][0] = s;
-                        c_info[current_bay[s][t][0]-1][1] = t;
-                        c_info[current_bay[s][t][0]-1][2] = current_bay[s][t][1];
-                        c_info[current_bay[s][t][0]-1][3] = current_bay[s][t][2];
-                        g_c_s[current_bay[s][t][0]-1][s] = containers_above_c;
+                    if (copy[s][t][0] != 0) {
+                        c_info[copy[s][t][0]-1][0] = s;
+                        c_info[copy[s][t][0]-1][1] = t;
+                        c_info[copy[s][t][0]-1][2] = copy[s][t][1];
+                        c_info[copy[s][t][0]-1][3] = copy[s][t][2];
+                        g_c_s[copy[s][t][0]-1][s] = containers_above_c;
                         containers_above_c++;
                         if (!highest_tier_found) {
                             s_info[s][0] = t;
                             highest_tier_found = true;
                         }
                         if (tier_ordered) {
-                            if (current_bay[s][t][2] == 0) {
+                            if (copy[s][t][2] == 0) {
                                 tier_ordered = false;
                             }
                         }
@@ -111,19 +111,26 @@ public class PreMarshallingJovanovic {
                 if (s_info[s][1] == 1) {
                     break;
                 }
-                else if (s_info[s][1] == 0) {
-                    if (current_bay[s][s_info[s][0]][1] > bay_info[0][0]) {
-                        bay_info[1][0] = bay_info[0][0];
-                        bay_info[1][1] = bay_info[0][1];
-                        bay_info[0][0] = current_bay[s][s_info[s][0]][1];
-                        bay_info[0][1] = s;
-                    } else if (current_bay[s][s_info[s][0]][1] > bay_info[1][0]) {
+                else  {
+                    if (copy[s][s_info[s][0]][1] > bay_info[0][0]) {
                         bay_info[2][0] = bay_info[1][0];
                         bay_info[2][1] = bay_info[1][1];
-                        bay_info[1][0] = current_bay[s][s_info[s][0]][1];
+                        bay_info[1][0] = bay_info[0][0];
+                        bay_info[1][1] = bay_info[0][1];
+                        bay_info[0][0] = copy[s][s_info[s][0]][1];
+                        bay_info[0][1] = s;
+                    } else if (copy[s][s_info[s][0]][1] == bay_info[0][0]) {
+                        bay_info[2][0] = bay_info[1][0];
+                        bay_info[2][1] = bay_info[1][1];
+                        bay_info[1][0] = copy[s][s_info[s][0]][1];
                         bay_info[1][1] = s;
-                    } else if (current_bay[s][s_info[s][0]][1] > bay_info[2][0]) {
-                        bay_info[2][0] = current_bay[s][s_info[s][0]][1];
+                    }else if (copy[s][s_info[s][0]][1] > bay_info[1][0]) {
+                        bay_info[2][0] = bay_info[1][0];
+                        bay_info[2][1] = bay_info[1][1];
+                        bay_info[1][0] = copy[s][s_info[s][0]][1];
+                        bay_info[1][1] = s;
+                    } else if (copy[s][s_info[s][0]][1] > bay_info[2][0]) {
+                        bay_info[2][0] = copy[s][s_info[s][0]][1];
                         bay_info[2][1] = s;
                     }
                 }
@@ -144,13 +151,13 @@ public class PreMarshallingJovanovic {
                     int containers_above_ca = 0;
                     int containers_w_above_ca = 0;
                     for (int t = tiers-1; t >= 0; t--) {
-                        if (current_bay[s][t][2] == 1 && current_bay[s][t][1] >= prio_c) {
+                        if (copy[s][t][2] == 1 && copy[s][t][1] >= prio_c) {
                             f_c_s[c][s] = containers_above_ca;
                             nw_c_s[c][s] = containers_w_above_ca;
                             break;
-                        } else if (current_bay[s][t][1] != 0) {
+                        } else if (copy[s][t][1] != 0) {
                             containers_above_ca++;
-                            if (current_bay[s][t][2] == 1){
+                            if (copy[s][t][2] == 1){
                                 containers_w_above_ca++;
                             }
                             if (t == 0) {
@@ -196,7 +203,7 @@ public class PreMarshallingJovanovic {
                 Set<Integer> indices = new HashSet<Integer>();
                 for(int s = 0; s < stacks; s++) {
                     //Stack steht nur zur Auswahl, wenn nicht (voll und geordnet)
-                    if (! (s_info[s][0] == tiers-1 && current_bay[s][tiers-1][2] == 1)) {
+                    if (! (s_info[s][0] == tiers-1 && copy[s][tiers-1][2] == 1)) {
                         if (w_c_s[c][s] < lowest_w_c_s) {
                             lowest_w_c_s = w_c_s[c][s];
                             indices.clear();
@@ -233,6 +240,9 @@ public class PreMarshallingJovanovic {
                     next_options_set.add(c);
                 }
             }
+            if (step == 16) {
+                int y = 9;
+            }
             Object [] next_options = next_options_set.toArray();
             if (next_selection == "function h_c") {
                 //number of forced relocations: in this approximation, a forced relocation occurs only if a block c is being relocated and all of the top stack due date values are larger than p(c)
@@ -241,14 +251,15 @@ public class PreMarshallingJovanovic {
                 //TODO: werden im Paper nur forced relocations aus stack s oder auch aus destination stack ss betrachtet? -> hier werden beide betrachtet (Option mit oder ohne?)
 
                 if (bay_info[0][0] != 0) {
-                    for (int c = 0; c < next_options.length; c++) {
+                    for (int cc = 0; cc < next_options.length; cc++) {
+                        int c = (int) next_options[cc];
                         //in current stack
                         int stack = c_info[c][0];
                         int height = c_info[c][1];
                         int current_height = s_info[stack][0];
                         int blocking_blocks = g_c_s[c][stack];
                         while ((current_height - blocking_blocks) >= height) {
-                            int cs_prio = current_bay[stack][current_height][2];
+                            int cs_prio = copy[stack][current_height][1];
                             if (cs_prio < bay_info[0][0] && bay_info[0][1] != stack) {
                                 fr_c_s[c] += 1;
                                 current_height--;
@@ -257,6 +268,8 @@ public class PreMarshallingJovanovic {
                                 current_height--;
                             } else if (cs_prio < bay_info[2][0] && bay_info[2][1] != stack) {
                                 fr_c_s[c] += 1;
+                                current_height--;
+                            } else {
                                 current_height--;
                             }
                         }
@@ -266,7 +279,7 @@ public class PreMarshallingJovanovic {
                         current_height = s_info[stack][0];
                         blocking_blocks = f_c_s[c][stack];
                         while ((current_height - blocking_blocks) >= height) {
-                            int cs_prio = current_bay[stack][current_height][2];
+                            int cs_prio = copy[stack][current_height][2];
                             if (cs_prio < bay_info[0][0] && bay_info[0][1] != stack) {
                                 fr_c_s[c] += 1;
                                 current_height--;
@@ -275,6 +288,8 @@ public class PreMarshallingJovanovic {
                                 current_height--;
                             } else if (cs_prio < bay_info[2][0] && bay_info[2][1] != stack) {
                                 fr_c_s[c] += 1;
+                                current_height--;
+                            } else {
                                 current_height--;
                             }
                         }
@@ -302,10 +317,10 @@ public class PreMarshallingJovanovic {
                             next = c;
                             min_value = h_c[c];
                             //TODO: distance-Berechnung überprüfen bzw. macht s_info Höhe=-1 Sinn?
-                            distance_destination_stack = Math.abs(c_info[next][0] - d_c[next]) + (tiers - c_info[next][1]) + (tiers - (s_info[d_c[next]][0] - f_c_s[next][d_c[next]]));
+                            distance_destination_stack = Math.abs(c_info[next][0] - d_c[next]) + (tiers - c_info[next][1]) + (tiers - (s_info[d_c[next]][0] - f_c_s[next][d_c[next]] + 1));
                         } else if (consider_distance && h_c[c] == min_value) {
                             int next_option = c;
-                            double distance_destination_stack_option = Math.abs(c_info[next_option][0] - d_c[next_option]) + (tiers - c_info[next_option][1]) + (tiers - (s_info[d_c[next_option]][0] - f_c_s[next_option][d_c[next_option]]));
+                            double distance_destination_stack_option = Math.abs(c_info[next_option][0] - d_c[next_option]) + (tiers - c_info[next_option][1]) + (tiers - (s_info[d_c[next_option]][0] - f_c_s[next_option][d_c[next_option]] + 1));
                             if (distance_destination_stack_option < distance_destination_stack) {
                                 min_value = h_c[c];
                                 next = c;
@@ -366,30 +381,30 @@ public class PreMarshallingJovanovic {
                 int i = 0;
                 while (blocking_blocks_s + blocking_blocks_ds > 0) {
                     if (blocking_blocks_s > 0 && blocking_blocks_ds > 0) {
-                        if (current_bay[stack_s][current_height_s][1] > current_bay[stack_ds][current_height_ds][1]) {
-                            order_relocations[i] = current_bay[stack_s][current_height_s][0] - 1;
+                        if (copy[stack_s][current_height_s][1] > copy[stack_ds][current_height_ds][1]) {
+                            order_relocations[i] = copy[stack_s][current_height_s][0] - 1;
                             current_height_s--;
                             blocking_blocks_s--;
                             i++;
-                        } else if (current_bay[stack_s][current_height_s][1] < current_bay[stack_ds][current_height_ds][1]) {
-                            order_relocations[i] = current_bay[stack_ds][current_height_ds][0] - 1;
+                        } else if (copy[stack_s][current_height_s][1] < copy[stack_ds][current_height_ds][1]) {
+                            order_relocations[i] = copy[stack_ds][current_height_ds][0] - 1;
                             current_height_ds--;
                             blocking_blocks_ds--;
                             i++;
                         } else {
                             //TODO: kann man hier eine Distanzberücksichtigung durchführen?
-                            order_relocations[i] = current_bay[stack_s][current_height_s][0] - 1; //Übergangsweise
+                            order_relocations[i] = copy[stack_s][current_height_s][0] - 1; //Übergangsweise
                             current_height_s--;
                             blocking_blocks_s--;
                             i++;
                         }
                     } else if (blocking_blocks_s > 0) {
-                        order_relocations[i] = current_bay[stack_s][current_height_s][0] - 1;
+                        order_relocations[i] = copy[stack_s][current_height_s][0] - 1;
                         current_height_s--;
                         blocking_blocks_s--;
                         i++;
                     } else if (blocking_blocks_ds > 0) {
-                        order_relocations[i] = current_bay[stack_ds][current_height_ds][0] - 1;
+                        order_relocations[i] = copy[stack_ds][current_height_ds][0] - 1;
                         current_height_ds--;
                         blocking_blocks_ds--;
                         i++;
@@ -406,12 +421,12 @@ public class PreMarshallingJovanovic {
                 }
                 for (int i = 0; i < order_relocations.length; i++) {
                     same_stack_over = true;
-                    order_relocations[i] = current_bay[stack_s][current_height_s][0] - 1;
+                    order_relocations[i] = copy[stack_s][current_height_s][0] - 1;
                     current_height_s--;
                 }
                 for (int i = 0; i < same_stack_below.length; i++) {
                     same_stack_under = true;
-                    same_stack_below[i] = current_bay[stack_s][current_height_s-1][0] - 1;
+                    same_stack_below[i] = copy[stack_s][current_height_s-1][0] - 1;
                     current_height_s--;
                 }
 
@@ -440,7 +455,7 @@ public class PreMarshallingJovanovic {
                             }
                             //prüfen, ob prio von c zwischen next und Block unter destination Platz und liegt genügend Platz in ds
                             /*
-                            else if ((c_info[order_relocations[c]][2] >= c_info[next][2]) && (c_info[order_relocations[c]][2] <= current_bay[s][s_info[s][0]][1]) && ((s_info[s][0] + 2) < tiers)) {
+                            else if ((c_info[order_relocations[c]][2] >= c_info[next][2]) && (c_info[order_relocations[c]][2] <= copy[s][s_info[s][0]][1]) && ((s_info[s][0] + 2) < tiers)) {
                                 if (s_info[s][0] < minimum_stack_height) {
                                     minimum_stack_height = s_info[s][0];
                                     stack_options.clear();
@@ -449,7 +464,7 @@ public class PreMarshallingJovanovic {
                                     stack_options.add(s);
                                 }
                             }
-                            */ //TODO: prüfen, ob nicht doch umsetzbar, im Original nicht berücksichtigt, zu berücksichtigen ist, ob umzulagernder Block in s oder ds
+                            */ //TODO: prüfen, ob nicht doch umsetzbar (im Original nicht berücksichtigt), zu berücksichtigen ist, ob umzulagernder Block in s oder ds
                             //könnte wie bei stopover_stack zwischengelagert werden, wenn in ds noch nicht alle blockierenden Blöcke frei sind bzw. muss sicherlich zwischengelagert werden,
                             //denn wenn es wird aus beiden Stacks immer niedrigste Prio (hohe Zahl) gewählt, um umgelagert zu werden
                         }
@@ -613,7 +628,7 @@ public class PreMarshallingJovanovic {
                 //TODO: in allen updates Parameter zu Beginn einführen, damit Indizes besser verständlich sind
             }
 
-            //TODO: avoiding deadlocks
+            //TODO: avoiding deadlocks -> wenn deadlock copy auf current_bay zurücksetzen und boolean-flags für verbotene moves bzw. verbotenen next-Block nutzen
 
             for(int s = 0; s < stacks; s++) {
                 for (int t = 0; t < tiers; t++) {
