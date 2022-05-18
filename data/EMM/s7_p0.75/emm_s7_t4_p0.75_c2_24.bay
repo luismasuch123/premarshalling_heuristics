@@ -1,0 +1,13 @@
+Name: ../../instances/emm_s7_t4_p0.75_c2
+Description: ../../instances/emm_s7_t4_p0.75_c2
+
+Tiers: 4
+Stacks: 7
+Containers: 21
+Stack 0: 4    4    2    0    
+Stack 1: 5    2    
+Stack 2: 3    0    1    1    
+Stack 3: 5    3    0    1    
+Stack 4: 2    3    1    
+Stack 5: 2    4    0    
+Stack 6: 5    

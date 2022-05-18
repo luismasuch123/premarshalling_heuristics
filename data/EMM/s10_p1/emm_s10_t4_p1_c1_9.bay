@@ -1,0 +1,16 @@
+Name: ../../instances/emm_s10_t4_p1_c1
+Description: ../../instances/emm_s10_t4_p1_c1
+
+Tiers: 4
+Stacks: 10
+Containers: 40
+Stack 0: 9    7    6    3    
+Stack 1: 4    6    4    3    
+Stack 2: 7    8    5    7    
+Stack 3: 0    4    2    3    
+Stack 4: 8    1    2    9    
+Stack 5: 5    3    5    2    
+Stack 6: 9    0    8    1    
+Stack 7: 5    1    6    0    
+Stack 8: 2    4    1    8    
+Stack 9: 0    9    6    7    
