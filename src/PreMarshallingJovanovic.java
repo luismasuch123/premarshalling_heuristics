@@ -6,7 +6,7 @@ public class PreMarshallingJovanovic {
 
     public static void main (String [] args) throws FileNotFoundException {
         String initial_bay_path = "/Users/luismasuchibanez/IdeaProjects/premarshalling_heuristics/data/Test/emm_s10_t4_p1_c0_16.bay";
-        boolean consider_distance = true;
+        boolean consider_time = true;
         String next_selection = "function h_c"; //"highest due date value"
         //TODO: certain improvements can be achieved by adding some fine tuning (stack_selection)
         String stack_selection = "The Lowest Position";//"Lowest Priority First", "MinMax"
@@ -19,21 +19,25 @@ public class PreMarshallingJovanovic {
             int tiers = (int) help[2];
             int containers = (int) help[3];
             System.out.println("Initial bay: " + Arrays.deepToString(initial_bay));
-            Object rueckgabe [] = premarshall(initial_bay, stacks, tiers, containers, consider_distance, next_selection, stack_selection, stack_filling);
+            Object rueckgabe [] = premarshall(initial_bay, stacks, tiers, containers, consider_time, next_selection, stack_selection, stack_filling);
             int [][][] final_bay = (int[][][]) rueckgabe[0];
             int relocations = (int) rueckgabe[1];
             int distance_relocations [] = (int[]) rueckgabe[2]; //tiers, stacks, (bays)
+            double time_relocations [] = new double [2];
+            time_relocations[0] = ((double) distance_relocations[0] * 2 * 15) /3600;
+            time_relocations[1] = ((double) distance_relocations[1] * 2 * 2.4) /3600;
 
             System.out.println("Final bay: " + Arrays.deepToString(final_bay));
             System.out.println("Relocations: " + relocations);
-            System.out.println("Distance: " + Arrays.toString(distance_relocations));
+            System.out.println("Distance_relocations in blocks: " + Arrays.toString(distance_relocations));
+            System.out.println("Time_relocations in: " + Arrays.toString(time_relocations));
         } catch (FileNotFoundException e) {
             System.out.println(("File not found!"));
         }
         
     }
 
-    private static Object[] premarshall(int[][][] initial_bay, int stacks, int tiers, int containers, boolean consider_distance, String next_selection, String stack_selection, String stack_filling) {
+    private static Object[] premarshall(int[][][] initial_bay, int stacks, int tiers, int containers, boolean consider_time, String next_selection, String stack_selection, String stack_filling) {
         int [][][] current_bay = new int [stacks][tiers][3];
         for(int s = 0; s < stacks; s++) {
             for (int t = 0; t < tiers; t++) {
@@ -74,7 +78,7 @@ public class PreMarshallingJovanovic {
 
             int s_info [][] = new int [stacks][2]; //highest tier, ordered
             int c_info [][] = new int[containers][4]; //stack, tier, prio, sorted
-            int bay_info [][] = new int [3][2]; //1st/2nd and 3rd highest top stack due date value of not well located stacks (prio and stack) or 0 if stack is well located
+            int bay_info [][] = new int [5][2]; //1st/2nd and 3rd highest top stack due date value of not well located stacks (prio and stack) and -1 at position 4 and/or 5 if there are empyty stacks
 
             //number of containers above c in stack s
             int g_c_s [][] = new int[containers][stacks];
@@ -107,9 +111,17 @@ public class PreMarshallingJovanovic {
                 s_info[s][1] = tier_ordered ? 1 : 0;
             }
             //calculating bay_info
+            int empty_stacks_count = 0;
             for (int s = 0; s < stacks; s++) {
                 if (s_info[s][1] == 1) {
-                    break;
+                    if (empty_stacks_count < 2) {
+                        bay_info[3 + empty_stacks_count][0] = s;
+                        bay_info[3 + empty_stacks_count][1] = -1;
+                        empty_stacks_count++;
+                    } else {
+                        //wenn zwei leere Stacks gefunden, kann es keine forced relocations geben -> fr_c_s dann uninteressant
+                        break;
+                    }
                 }
                 else  {
                     if (copy[s][s_info[s][0]][1] > bay_info[0][0]) {
@@ -215,12 +227,12 @@ public class PreMarshallingJovanovic {
 
                 }
                 //indices mit gleichen w_c_s durchlaufen, um den Stack mit dem geringsten Abstand zu c zu finden
-                if (consider_distance) {
-                    double distance_stack = 100000;
+                if (consider_time) {
+                    double time_to_stack = 100000;
                     for (int indice : indices) {
                         //Enfernungen mit passenden Faktoren belegen
-                        double distance_current_stack = Math.abs(c_info[c][0] - indice) + (tiers - c_info[c][1]) + (tiers - (s_info[indice][0] - f_c_s[c][indice]));
-                        if (distance_current_stack < distance_stack) {
+                        double time_to_current_stack = (double) Math.abs(c_info[c][0] - indice) * 2.4 + (double) ((tiers - c_info[c][1]) + (tiers - (s_info[indice][0] - f_c_s[c][indice]))) * 15.0;
+                        if (time_to_current_stack < time_to_stack) {
                             d_c[c] = indice;
                         }
                     }
@@ -250,48 +262,59 @@ public class PreMarshallingJovanovic {
                 int[] fr_c_s = new int[containers];
                 //TODO: werden im Paper nur forced relocations aus stack s oder auch aus destination stack ss betrachtet? -> hier werden beide betrachtet (Option mit oder ohne?)
 
-                if (bay_info[0][0] != 0) {
+                //wenn es zwei empty stacks gibt, kann es keine forced relocations geben
+                if (! (bay_info[3][1] == -1 && bay_info[4][0] == -1)) {
                     for (int cc = 0; cc < next_options.length; cc++) {
                         int c = (int) next_options[cc];
-                        //in current stack
-                        int stack = c_info[c][0];
-                        int height = c_info[c][1];
-                        int current_height = s_info[stack][0];
-                        int blocking_blocks = g_c_s[c][stack];
-                        while ((current_height - blocking_blocks) >= height) {
-                            int cs_prio = copy[stack][current_height][1];
-                            if (cs_prio < bay_info[0][0] && bay_info[0][1] != stack) {
-                                fr_c_s[c] += 1;
-                                current_height--;
-                            } else if (cs_prio < bay_info[1][0] && bay_info[1][1] != stack) {
-                                fr_c_s[c] += 1;
-                                current_height--;
-                            } else if (cs_prio < bay_info[2][0] && bay_info[2][1] != stack) {
-                                fr_c_s[c] += 1;
-                                current_height--;
-                            } else {
-                                current_height--;
+                        //wenn es mindestens einen empty stack gibt, dann kann es aus current stack heraus keine forced relocation geben
+                        if (bay_info[3][1] == 0) {
+                            //in current stack
+                            int stack = c_info[c][0];
+                            int height = c_info[c][1];
+                            int current_height = s_info[stack][0];
+                            int blocking_blocks = g_c_s[c][stack];
+                            while ((current_height - blocking_blocks) >= height) {
+                                int cs_prio = copy[stack][current_height][1];
+                                if (cs_prio < bay_info[0][0] && bay_info[0][1] != stack) {
+                                    fr_c_s[c] += 1;
+                                    current_height--;
+                                } else if (cs_prio < bay_info[1][0] && bay_info[1][1] != stack) {
+                                    fr_c_s[c] += 1;
+                                    current_height--;
+                                } else if (cs_prio < bay_info[2][0] && bay_info[2][1] != stack) {
+                                    fr_c_s[c] += 1;
+                                    current_height--;
+                                } else {
+                                    current_height--;
+                                }
                             }
+                        } else {
+                            break;
                         }
-                        //in destination stack
-                        stack = d_c[c];
-                        height = s_info[stack][0] - f_c_s[c][stack];
-                        current_height = s_info[stack][0];
-                        blocking_blocks = f_c_s[c][stack];
-                        while ((current_height - blocking_blocks) >= height) {
-                            int cs_prio = copy[stack][current_height][2];
-                            if (cs_prio < bay_info[0][0] && bay_info[0][1] != stack) {
-                                fr_c_s[c] += 1;
-                                current_height--;
-                            } else if (cs_prio < bay_info[1][0] && bay_info[1][1] != stack) {
-                                fr_c_s[c] += 1;
-                                current_height--;
-                            } else if (cs_prio < bay_info[2][0] && bay_info[2][1] != stack) {
-                                fr_c_s[c] += 1;
-                                current_height--;
-                            } else {
-                                current_height--;
+                        //wenn es mehr als einen empty stack gibt oder der empty stack nicht dem destination stack entspricht, dann kann es aus destination stack heraus keine forced relocation geben
+                        if (!(bay_info[3][1] == d_c[c] && bay_info[4][1] == 0)) {
+                            //in destination stack
+                            int stack = d_c[c];
+                            int height = s_info[stack][0] - f_c_s[c][stack];
+                            int current_height = s_info[stack][0];
+                            int blocking_blocks = f_c_s[c][stack];
+                            while ((current_height - blocking_blocks) >= height && current_height != -1) {
+                                int cs_prio = copy[stack][current_height][2];
+                                if (cs_prio < bay_info[0][0] && bay_info[0][1] != stack) {
+                                    fr_c_s[c] += 1;
+                                    current_height--;
+                                } else if (cs_prio < bay_info[1][0] && bay_info[1][1] != stack) {
+                                    fr_c_s[c] += 1;
+                                    current_height--;
+                                } else if (cs_prio < bay_info[2][0] && bay_info[2][1] != stack) {
+                                    fr_c_s[c] += 1;
+                                    current_height--;
+                                } else {
+                                    current_height--;
+                                }
                             }
+                        } else {
+                            break;
                         }
                     }
                 }
@@ -309,7 +332,7 @@ public class PreMarshallingJovanovic {
                 //indice of next block to be relocated is calculated
                 //TODO: can in most cases be calculated by evaluating h_c for a small number of blocks -> kaum Einsparung?!
                 int min_value = 1000000; //TODO: jedes Mal Distanz vergleichen wenn gleicher Wert oder doch lieber Set und nur Distanz vergleichen wenn am Ende mehr als ein Eintrag?
-                double distance_destination_stack = 1000000;
+                double time_to_destination_stack = 1000000;
                 if (next_option_found) {
                     for (int cc = 0; cc < next_options.length; cc++) {
                         int c = (int) next_options[cc];
@@ -317,11 +340,11 @@ public class PreMarshallingJovanovic {
                             next = c;
                             min_value = h_c[c];
                             //TODO: distance-Berechnung überprüfen bzw. macht s_info Höhe=-1 Sinn?
-                            distance_destination_stack = Math.abs(c_info[next][0] - d_c[next]) + (tiers - c_info[next][1]) + (tiers - (s_info[d_c[next]][0] - f_c_s[next][d_c[next]] + 1));
-                        } else if (consider_distance && h_c[c] == min_value) {
+                            time_to_destination_stack = (double) Math.abs(c_info[next][0] - d_c[next]) * 2.4 + (double) ((tiers - c_info[next][1]) + (tiers - (s_info[d_c[next]][0] - f_c_s[next][d_c[next]] + 1))) * 15.0;
+                        } else if (consider_time && h_c[c] == min_value) {
                             int next_option = c;
-                            double distance_destination_stack_option = Math.abs(c_info[next_option][0] - d_c[next_option]) + (tiers - c_info[next_option][1]) + (tiers - (s_info[d_c[next_option]][0] - f_c_s[next_option][d_c[next_option]] + 1));
-                            if (distance_destination_stack_option < distance_destination_stack) {
+                            double time_to_destination_stack_option = (double) Math.abs(c_info[next_option][0] - d_c[next_option]) * 2.4 + (double) ((tiers - c_info[next_option][1]) + (tiers - (s_info[d_c[next_option]][0] - f_c_s[next_option][d_c[next_option]] + 1))) * 15.0;
+                            if (time_to_destination_stack_option < time_to_destination_stack) {
                                 min_value = h_c[c];
                                 next = c;
                             }
@@ -332,17 +355,17 @@ public class PreMarshallingJovanovic {
                 }
             } else if (next_selection == "highest due date value") {
                 int highest_due_date = 0;
-                double distance_destination_stack = 1000000;
+                double time_to_destination_stack = 1000000;
                 if (next_option_found) {
                     for (int cc = 0; cc < next_options.length; cc++) {
                         int c = (int) next_options[cc];
                         if (c_info[c][2] > highest_due_date) {
                             highest_due_date = c_info[c][2];
                             next = c;
-                        } else if (c_info[c][2] == highest_due_date) {
+                        } else if (consider_time && c_info[c][2] == highest_due_date) {
                             int next_option = c;
-                            double distance_destination_stack_option = Math.abs(c_info[next_option][0] - d_c[next_option]) + (tiers - c_info[next_option][1]) + (tiers - (s_info[d_c[next_option]][0] - f_c_s[next_option][d_c[next_option]]));
-                            if (distance_destination_stack_option < distance_destination_stack) {
+                            double time_to_destination_stack_option = (double) Math.abs(c_info[next_option][0] - d_c[next_option]) * 2.4 + (double) ((tiers - c_info[next_option][1]) + (tiers - (s_info[d_c[next_option]][0] - f_c_s[next_option][d_c[next_option]]))) * 15.0;
+                            if (time_to_destination_stack_option < time_to_destination_stack) {
                                 highest_due_date = c_info[c][2];
                                 next = c;
                             }
@@ -469,13 +492,13 @@ public class PreMarshallingJovanovic {
                             //denn wenn es wird aus beiden Stacks immer niedrigste Prio (hohe Zahl) gewählt, um umgelagert zu werden
                         }
                     }
-                    if (stack_options.size() == 1 || !consider_distance) {
+                    if (stack_options.size() == 1 || !consider_time) {
                         selected_stack = stack_options.first();
-                    } else if (consider_distance){
-                        double distance_destination_stack = 1000000;
+                    } else if (consider_time){
+                        double time_to_destination_stack = 1000000;
                         for (int stack: stack_options) {
-                            double distance_destination_stack_option = Math.abs(c_info[order_relocations[c]][0] - stack) + (tiers - c_info[order_relocations[c]][1]) + (tiers - (s_info[stack][0]));
-                            if (distance_destination_stack_option < distance_destination_stack) {
+                            double time_to_destination_stack_option = (double) Math.abs(c_info[order_relocations[c]][0] - stack) * 2.4 + (double) ((tiers - c_info[order_relocations[c]][1]) + (tiers - (s_info[stack][0]))) * 15.0;
+                            if (time_to_destination_stack_option < time_to_destination_stack) {
                                 selected_stack = stack;
                             }
                         }
@@ -537,13 +560,13 @@ public class PreMarshallingJovanovic {
                                 }
                             }
                         }
-                        if (stack_options.size() == 1 || !consider_distance) {
+                        if (stack_options.size() == 1 || !consider_time) {
                             selected_stack[c] = stack_options.first();
-                        } else if (consider_distance) {
-                            double distance_destination_stack = 1000000;
+                        } else if (consider_time) {
+                            double time_to_destination_stack = 1000000;
                             for (int stack : stack_options) {
-                                double distance_destination_stack_option = Math.abs(c_info[same_stack_below[c]][0] - stack) + (tiers - c_info[same_stack_below[c]][1]) + (tiers - (s_info_help[stack][0]));
-                                if (distance_destination_stack_option < distance_destination_stack) {
+                                double time_to_destination_stack_option = (double) Math.abs(c_info[same_stack_below[c]][0] - stack) * 2.4 + (double) ((tiers - c_info[same_stack_below[c]][1]) + (tiers - (s_info_help[stack][0]))) * 15.0;
+                                if (time_to_destination_stack_option < time_to_destination_stack) {
                                     selected_stack[c] = stack;
                                 }
                             }
@@ -559,7 +582,7 @@ public class PreMarshallingJovanovic {
                 System.out.println("selected_stack: " + Arrays.toString(selected_stack));
 
                 //next in nächsten Stack s umgelagern, der keinem der Stacks aus selected_stack[] entspricht (am besten der nächste Platz)
-                double distance_stopover_stack = 100000;
+                double time_to_stopover_stack = 100000;
                 int stopover_stack = 0;
                 for (int s = 0; s < stacks; s++) {
                     //prüft, ob s einem der selected_stacks für same_stack_below-Blöcke entspricht
@@ -574,10 +597,10 @@ public class PreMarshallingJovanovic {
                     //stopover_stack darf weder einem der selected_stacks für same_stack_below-Blöcke, noch dem destination stack entsprechen
                     //außerdem darf stopover_stack nicht voll sein
                     if (!selected_stacks_contains_s && s != d_c[next] && s_info[s][0] < tiers-1) {
-                        if (consider_distance) {
-                            double distance_stopover_stack_option = Math.abs(c_info[next][0] - s) + (tiers - c_info[next][1]) + (tiers - (s_info[s][0]));
-                            if (distance_stopover_stack_option < distance_stopover_stack) {
-                                distance_stopover_stack = distance_stopover_stack_option;
+                        if (consider_time) {
+                            double time_to_stopover_stack_option = (double) Math.abs(c_info[next][0] - s) * 2.4 + (double) ((tiers - c_info[next][1]) + (tiers - (s_info[s][0]))) * 15.0;
+                            if (time_to_stopover_stack_option < time_to_stopover_stack) {
+                                time_to_stopover_stack = time_to_stopover_stack_option;
                                 stopover_stack = s;
                             }
                         } else {
