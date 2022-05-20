@@ -5,11 +5,13 @@ import java.util.*;
 public class PreMarshallingJovanovic {
 
     static boolean consider_time;
+    static boolean multiple_bays;
 
     static String next_selection;
     static String stack_selection;
     static String stack_filling;
 
+    static int bays;
     static int stacks;
     static int tiers;
     static int containers;
@@ -51,6 +53,7 @@ public class PreMarshallingJovanovic {
     public static void main (String [] args) throws FileNotFoundException {
         String initial_bay_path = "/Users/luismasuchibanez/IdeaProjects/premarshalling_heuristics/data/Test/emm_s10_t4_p1_c0_16.bay";
         consider_time = true;
+        multiple_bays = true;
         next_selection = "function h_c"; //"highest due date value"
         //TODO: certain improvements can be achieved by adding some fine tuning (stack_selection)
         stack_selection = "The Lowest Position";//"Lowest Priority First", "MinMax"
@@ -142,12 +145,10 @@ public class PreMarshallingJovanovic {
             }
 
             //die Blöcke umlagern, die next blockieren (egal welcher stack) oder next's Platz im destination stack blockieren (wenn stack gleich destination stack)
-            relocate_blocking_blocks(); //TODO: relocations dürfen nicht vor next durchgeführt werden, falls sie in stack s von next hinein umgelagert werden, dann
+            relocate_blocking_blocks();
 
             //next umlagern
-            //TODO: wann kann/muss deadlock gesetzt und wieder entfernt werden?
             if (!deadlock) {
-                deadlock = false;
                 deadlock_next = new int[containers];
                 relocate_next(); //TODO: immer prüfen, ob über next der Weg frei ist für Umlagerung -> generell in relocate prüfen
             } else {
@@ -456,6 +457,7 @@ public class PreMarshallingJovanovic {
                 } else if (stack_options.size() == 1 || !consider_time) {
                     selected_stacks[c] = stack_options.first();
                     s_info_help[selected_stacks[c]][0] += 1;
+                    deadlock = false;
                 } else if (consider_time) {
                     double time_to_destination_stack = 1000000;
                     for (int stack : stack_options) {
@@ -465,6 +467,7 @@ public class PreMarshallingJovanovic {
                         }
                     }
                     s_info_help[selected_stacks[c]][0] += 1;
+                    deadlock = false;
                 }
             } else if (stack_selection == "Lowest Priority Index") {
 
@@ -888,36 +891,75 @@ public class PreMarshallingJovanovic {
     private static void get_initial_bay(String initial_bay_path) throws FileNotFoundException {
         Scanner scanner = new Scanner(new File(initial_bay_path));
 
-        scanner.nextLine();
-        scanner.nextLine();
-        scanner.nextLine();
-        scanner.next();
-        tiers = scanner.nextInt();
-        System.out.println("Tiers: " + tiers);
-        scanner.next();
-        stacks = scanner.nextInt();
-        System.out.println("Stacks: " + stacks);
-        scanner.next();
-        containers = scanner.nextInt();
-        System.out.println("Containers: " + containers);
-        scanner.nextLine();
+        if (multiple_bays) {
+            scanner.nextLine();
+            scanner.nextLine();
+            scanner.nextLine();
+            scanner.next();
+            bays = scanner.nextInt();
+            System.out.println("Bays: " + bays);
+            scanner.next();
+            tiers = scanner.nextInt();
+            System.out.println("Tiers: " + tiers);
+            scanner.next();
+            stacks = scanner.nextInt() / bays;
+            System.out.println("Stacks: " + stacks);
+            scanner.next();
+            containers = scanner.nextInt();
+            System.out.println("Containers: " + containers);
+            scanner.nextLine();
 
-        initial_bay = new int[stacks][tiers][3]; //3-te Dimension: Nummer, Prio, well-located
-        int number_container = 1;
-        for(int i=0; i < stacks; i++) {
-            String str = scanner.nextLine();
-            //System.out.println("nextLine: " + str);
-            str = str.replaceAll("[^-?0-9]+", " ");
-            String [] help = (str.trim().split(" "));
-            //System.out.println(Arrays.toString(help));
-            int j = 0;
-            while(j < help.length-1){
-                //priorities werden um jeweils 1 erhöht, damit leere felder den eintrag 0 erhalten können
-                initial_bay[i][j][0] = number_container;
-                initial_bay[i][j][1] = Integer.parseInt(help[j+1]) + 1;
-                //System.out.println(initial_bay[i][j]);
-                j++;
-                number_container++;
+            initial_bay = new int[stacks][tiers][3]; //3-te Dimension: Nummer, Prio, well-located
+            int number_container = 1;
+            for (int b = 0; b < bays; b++) {
+                for (int s = 0; s < stacks; s++) {
+                    String str = scanner.nextLine();
+                    //System.out.println("nextLine: " + str);
+                    str = str.replaceAll("[^-?0-9]+", " ");
+                    String[] help = (str.trim().split(" "));
+                    //System.out.println(Arrays.toString(help));
+                    for (int t = 0; t < help.length - 1; t++) {
+                        //priorities werden um jeweils 1 erhöht, damit leere felder den eintrag 0 erhalten können
+                        initial_bay[s][t][0] = number_container;
+                        initial_bay[s][t][1] = Integer.parseInt(help[t + 1]) + 1;
+                        //System.out.println(initial_bay[i][j]);
+                        number_container++;
+                    }
+                }
+            }
+        } else {
+            scanner.nextLine();
+            scanner.nextLine();
+            scanner.nextLine();
+            scanner.next();
+            bays = 1;
+            System.out.println("Bays: " + bays);
+            scanner.next();
+            tiers = scanner.nextInt();
+            System.out.println("Tiers: " + tiers);
+            scanner.next();
+            stacks = scanner.nextInt();
+            System.out.println("Stacks: " + stacks);
+            scanner.next();
+            containers = scanner.nextInt();
+            System.out.println("Containers: " + containers);
+            scanner.nextLine();
+
+            initial_bay = new int[stacks][tiers][3]; //3-te Dimension: Nummer, Prio, well-located
+            int number_container = 1;
+            for (int s = 0; s < stacks; s++) {
+                String str = scanner.nextLine();
+                //System.out.println("nextLine: " + str);
+                str = str.replaceAll("[^-?0-9]+", " ");
+                String[] help = (str.trim().split(" "));
+                //System.out.println(Arrays.toString(help));
+                for (int t = 0; t < help.length - 1; t++) {
+                    //priorities werden um jeweils 1 erhöht, damit leere felder den eintrag 0 erhalten können
+                    initial_bay[s][t][0] = number_container;
+                    initial_bay[s][t][1] = Integer.parseInt(help[t + 1]) + 1;
+                    //System.out.println(initial_bay[i][j]);
+                    number_container++;
+                }
             }
         }
     }

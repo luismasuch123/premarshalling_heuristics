@@ -1,10 +1,9 @@
 Name: ../../instances/emm_s10_t4_p1_c0
 Description: ../../instances/emm_s10_t4_p1_c0
 
-bays: 4
 Tiers: 5
-Stacks: 20
-Containers: 66
+Stacks: 40
+Containers: 132
 Stack 0: 0    5    6    9    
 Stack 1: 2    5
 Stack 2: 2    5    8    6    
@@ -25,3 +24,23 @@ Stack 16: 0    5    8
 Stack 17: 1    3    7    8
 Stack 18: 2    5    9
 Stack 19: 1    4    4    6
+Stack 20: 7    5    6    9
+Stack 21: 2    5
+Stack 22: 2    5    8    6
+Stack 23: 1    3    7    9
+Stack 24: 0    4    7
+Stack 25: 5    3    8    9
+Stack 26: 4    5    3    8
+Stack 27: 2    1    4
+Stack 28: 2    3    4    9
+Stack 29: 0    3
+Stack 30: 2    9
+Stack 31: 0    5    5    6
+Stack 32: 1    4    3    7
+Stack 33:
+Stack 34: 2    0    9    8
+Stack 35: 0    8    4    7
+Stack 36: 2    5    8
+Stack 37: 1    3    7    8
+Stack 38: 2    5    9
+Stack 39: 1    4    2    6
