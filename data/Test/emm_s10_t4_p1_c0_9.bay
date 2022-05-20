@@ -1,7 +1,7 @@
 Name: ../../instances/emm_s10_t4_p1_c0
 Description: ../../instances/emm_s10_t4_p1_c0
 
-Tiers: 4
+Tiers: 6
 Stacks: 10
 Containers: 40
 Stack 0: 2    1    3    9    

@@ -17,15 +17,35 @@ public class PreMarshallingJovanovic {
     static int [][][] initial_bay;
     static int [][][] current_bay;
     static int [][][] copy;
-    /*
-    static int [][] bay_info = new int [5][2];
-    static int [][] s_info;
-    static int [][] c_info;
 
-     */
+    static int [][] bay_info = new int [5][2]; //1st/2nd and 3rd highest top stack due date value of not well located stacks (prio and stack) and -1 at position 4 and/or 5 if there are empyty stacks
+    static int [][] s_info; //highest tier, ordered
+    static int [][] c_info; //stack, tier, prio, sorted
 
+    static int [][]  g_c_s; //number of containers above c in stack s
+    static int [][] f_c_s; //containers above well located block c_a with larger or same due date value than c in destination stack s
+    static int [][]nw_c_s; //well located containers that need to be relocated when c is moved to destination stack s
+    static int [][] f_c_s_ext; //berücksichtigt zusätzlich zu f_c_s, dass Umlagerungen von bereits richtig platzierten Blöcken vermieden werden sollten
+    static int [][] w_c_s; //Summe der Blöcke, die bei einer Umlagerung von c aus stack s in destination stack ss, aus s und ss heraus umgelagert werden müssen
+    static int [] d_c; //d_c is the index of the stack that the lowest value of w_c_s for a block c and if tied the minimum distance to c
+
+    static boolean same_stack;
+    static boolean same_stack_over;
+    static boolean same_stack_under;
+    static boolean next_to_stopover_stack_prevent_deadlock;
+    static int stopover_stack_prevent_deadlock;
+    static boolean deadlock;
+    static int deadlock_count;
+    static int [] deadlock_next;
+    static int [] order_relocations;
+    static int [] selected_stacks;
+    static int [] same_stack_below;
+    static int next;
+
+    static int step = 1;
     static int relocations = 0;
     static int [] distance_relocations = new int[3];
+    static double time_relocations [] = new double [2];
 
 
     public static void main (String [] args) throws FileNotFoundException {
@@ -36,16 +56,12 @@ public class PreMarshallingJovanovic {
         stack_selection = "The Lowest Position";//"Lowest Priority First", "MinMax"
         stack_filling = " ";
         try {
-            Object [] help = get_initial_bay(initial_bay_path);
-            initial_bay = (int[][][]) help[0];
-            stacks = (int) help[1];
-            tiers = (int) help[2];
-            containers = (int) help[3];
+            get_initial_bay(initial_bay_path);
+            //check if blocks are well located or not (1:well located, 0: not well located)
+            compute_if_well_located(initial_bay);
             System.out.println("Initial bay: " + Arrays.deepToString(initial_bay));
 
-            Object rueckgabe [] = premarshall(initial_bay);
-            int [][][] final_bay = (int[][][]) rueckgabe[0];
-            double time_relocations [] = new double [2];
+            int [][][] final_bay = premarshall(initial_bay);
             time_relocations[0] = ((double) distance_relocations[0] * 2 * 15) /3600;
             time_relocations[1] = ((double) distance_relocations[1] * 2 * 2.4) /3600;
 
@@ -53,121 +69,98 @@ public class PreMarshallingJovanovic {
             System.out.println("Relocations: " + relocations);
             System.out.println("Distance_relocations in blocks: " + Arrays.toString(distance_relocations));
             System.out.println("Time_relocations in: " + Arrays.toString(time_relocations));
+            if (deadlock_count > 0) {
+                System.out.println("Deadlocks: " + deadlock_count);
+            }
         } catch (FileNotFoundException e) {
             System.out.println(("File not found!"));
         }
         
     }
 
-    private static Object[] premarshall(int[][][] initial_bay) {
+    private static int[][][] premarshall(int[][][] initial_bay) {
         current_bay = new int[stacks][tiers][3];
         current_bay = copy_bay(initial_bay, current_bay);
 
-        //check if blocks are well located or not (1:well located, 0: not well located)
-        current_bay = compute_if_well_located(current_bay);
+        s_info = new int [stacks][2];
+        c_info = new int[containers][4];
+
+        copy = new int[stacks][tiers][3]; //Kopie, damit current_bay nicht verändert wird, falls Schritt rückgängig gemacht werden muss nach look-ahead
 
         boolean sorted = false; //TODO: Möglichkeit, dass bereits geordnet ist einbauen?
-        int relocations = 0;
-        int distance_relocations [] = new int [3]; //tiers, stacks, (bays)
-        int step = 1;
+        deadlock = false;
+        deadlock_next = new int[containers];
         while(!sorted) {
             System.out.println("Step " + step);
             System.out.println("Current bay: " + Arrays.deepToString(current_bay));
             step++;
-            //Kopie, damit current_bay nicht verändert wird, falls Schritt rückgängig gemacht werden muss nach look-ahead
-            copy = new int[stacks][tiers][3];
+
             copy = copy_bay(current_bay, copy);
 
-            int s_info [][] = new int [stacks][2]; //highest tier, ordered
-            int c_info [][] = new int[containers][4]; //stack, tier, prio, sorted
-            int bay_info [][] = new int [5][2]; //1st/2nd and 3rd highest top stack due date value of not well located stacks (prio and stack) and -1 at position 4 and/or 5 if there are empyty stacks
-
-            //number of containers above c in stack s
-            int g_c_s [][] = new int[containers][stacks];
-            Object [] rueckgabe = compute__c_info__s_info__g_c_s(c_info, s_info, g_c_s);
-            c_info = (int[][]) rueckgabe[0];
-            s_info = (int[][]) rueckgabe[1];
-            g_c_s = (int[][]) rueckgabe[2];
+            g_c_s = new int[containers][stacks];
+            compute__c_info__s_info__g_c_s();
 
             //calculating bay_info
-            bay_info = compute_bay_info(s_info, bay_info);
+            compute_bay_info();
 
             System.out.println("c_info: " + Arrays.deepToString(c_info));
             System.out.println("s_info: " + Arrays.deepToString(s_info));
             //System.out.println("bay_info: " + Arrays.deepToString(bay_info));
             //System.out.println("g_c_s: " + Arrays.deepToString(g_c_s));
 
-            //containers above well located block c_a with larger or same due date value than c in destination stack s
             //TODO: wirklich larger or same due date value?
-            int f_c_s [][] = new int[containers][stacks];
-            //well located containers that need to be relocated when c is moved to destination stack s
-            int nw_c_s [][] = new int[containers][stacks];
-            rueckgabe = compute__f_c_s__nw_c_s(c_info, f_c_s, nw_c_s);
-            f_c_s = (int[][]) rueckgabe[0];
-            nw_c_s = (int[][]) rueckgabe[1];
-
+            f_c_s = new int[containers][stacks];
+            nw_c_s = new int[containers][stacks];
+            compute__f_c_s__nw_c_s();
             //System.out.println("f_c_s: " + Arrays.deepToString(f_c_s));
             //System.out.println("nw_c_s: " + Arrays.deepToString(nw_c_s));
 
-            //berücksichtigt zusätzlich zu f_c_s, dass Umlagerungen von bereits richtig platzierten Blöcken vermieden werden sollten
-            int f_c_s_ext [][] = new int[containers][stacks];
-            for (int c = 0; c < containers; c++) {
-                for (int s = 0; s < stacks; s++) {
-                    f_c_s_ext[c][s] = f_c_s[c][s] + nw_c_s[c][s];
-                }
-            }
+            f_c_s_ext = new int[containers][stacks];
+            compute__f_c_s_ext();
             //System.out.println("f_c_s_ext: " + Arrays.deepToString(f_c_s_ext));
 
-            //Summe der Blöcke, die bei einer Umlagerung von c aus stack s in destination stack ss, aus s und ss heraus umgelagert werden müssen
-            int w_c_s [][] = new int[containers][stacks];
-            for (int c = 0; c < containers; c++) {
-                for (int s = 0; s < stacks; s++) {
-                    if (c_info[c][0] != s) {
-                        w_c_s[c][s] = f_c_s_ext[c][s] + g_c_s[c][c_info[c][0]] + 1;
-                    } else {
-                        w_c_s[c][s] = f_c_s_ext[c][s] + 1;
-                    }
-                }
-            }
+            w_c_s = new int[containers][stacks];
+            compute__w_c_s();
             //System.out.println("w_c_s: " + Arrays.deepToString(w_c_s));
 
-            //w_c_s minimieren, um den destination stack s herauszufinden, in den Block c umgelagert werden soll
-            //d_c is the index of the stack that the lowest value of w_c_s for a block c and if tied the minimum distance to c
-            int d_c [] = new int [containers];
-            d_c = compute_d_c(c_info, s_info, f_c_s, w_c_s, d_c);
+            d_c = new int [containers];
+            compute_d_c();
             System.out.println("d_c: " + Arrays.toString(d_c));
 
-            int next = get_next(c_info, s_info, bay_info, g_c_s, d_c, f_c_s, w_c_s);
+            get_next();
             System.out.println("next: " + next + " from stack " + c_info[next][0] + " to stack " + d_c[next]);
 
-            boolean same_stack = false;
-            boolean same_stack_over = false;
-            boolean same_stack_under = false;
+            same_stack = false;
+            same_stack_over = false;
+            same_stack_under = false;
+            next_to_stopover_stack_prevent_deadlock = false;
 
-            rueckgabe = compute__order_relocations__same_stack_below(c_info, s_info, next, same_stack, same_stack_over, same_stack_under, d_c, g_c_s, f_c_s);
-            int [] order_relocations = (int[]) rueckgabe[0];
-            int [] same_stack_below = (int[]) rueckgabe[1];
-            same_stack = (boolean) rueckgabe[2];
-            same_stack_over = (boolean) rueckgabe[3];
-            same_stack_under = (boolean) rueckgabe[4];
-
+            compute__order_relocations__same_stack_below(next);
             System.out.println("order_relocations: " + Arrays.toString(order_relocations));
             if (same_stack_under) {
                 System.out.println("same_stack_below: " + Arrays.toString(same_stack_below));
             }
 
             //die Blöcke umlagern, die next blockieren (egal welcher stack) oder next's Platz im destination stack blockieren (wenn stack gleich destination stack)
-            rueckgabe = relocate_blocking_blocks(c_info, s_info, next, d_c, order_relocations, same_stack_over);
-            s_info = (int[][]) rueckgabe[0];
-            c_info = (int[][]) rueckgabe[1];
+            relocate_blocking_blocks(); //TODO: relocations dürfen nicht vor next durchgeführt werden, falls sie in stack s von next hinein umgelagert werden, dann
 
             //next umlagern
-            rueckgabe = relocate_next(c_info, s_info, next, d_c, same_stack_under, same_stack_below);
-            s_info = (int[][]) rueckgabe[0];
-            c_info = (int[][]) rueckgabe[1];
+            //TODO: wann kann/muss deadlock gesetzt und wieder entfernt werden?
+            if (!deadlock) {
+                deadlock = false;
+                deadlock_next = new int[containers];
+                relocate_next(); //TODO: immer prüfen, ob über next der Weg frei ist für Umlagerung -> generell in relocate prüfen
+            } else {
+                System.out.println("DEADLOCK!");
+                deadlock_next[next] = next+1;
+                System.out.println("deadlock_next: " + Arrays.toString(deadlock_next));
+                deadlock_count++;
+                copy = copy_bay(current_bay, copy);
+            }
 
 
             //TODO: avoiding deadlocks -> wenn deadlock copy auf current_bay zurücksetzen und boolean-flags für verbotene moves bzw. verbotenen next-Block nutzen
+            //TODO: stopover stack wenn s = ds, derjenige mit einem freien Platz, wenn freie_Plätze(abgesehen von Plätzen in s) - f_c_s = 1
             current_bay = copy_bay(copy, current_bay);
 
             boolean stacks_sorted = true;
@@ -182,49 +175,73 @@ public class PreMarshallingJovanovic {
             //TODO: Distanzen bei Leerfahrten berücksichtigen
         }
         //TODO: Corrections
-
-        return new Object [] {current_bay, relocations, distance_relocations};
+        return current_bay;
     }
 
-    private static int get_next(int[][] c_info, int[][] s_info, int[][] bay_info, int[][] g_c_s, int[] d_c, int[][] f_c_s, int[][] w_c_s) {
-        int next;
+    private static void compute__w_c_s() {
+        for (int c = 0; c < containers; c++) {
+            for (int s = 0; s < stacks; s++) {
+                if (c_info[c][0] != s) {
+                    w_c_s[c][s] = f_c_s_ext[c][s] + g_c_s[c][c_info[c][0]] + 1;
+                } else {
+                    w_c_s[c][s] = f_c_s_ext[c][s] + 1;
+                }
+            }
+        }
+    }
+
+    private static void compute__f_c_s_ext() {
+        for (int c = 0; c < containers; c++) {
+            for (int s = 0; s < stacks; s++) {
+                f_c_s_ext[c][s] = f_c_s[c][s] + nw_c_s[c][s];
+            }
+        }
+    }
+
+    private static void get_next() {
         boolean next_option_found = false;
         TreeSet<Integer> next_options_set = new TreeSet<>();
         for (int c = 0; c < containers; c++) {
-            if (c_info[c][3] == 0) {
-                next_option_found = true;
-                next_options_set.add(c);
-            }
-        }
-        Object [] next_options = next_options_set.toArray();
-        if (next_option_found) {
-            next = (int) next_options[0];
-        } else {
-            next = 0;
-        }
-        if (next_selection == "function h_c") {
-            next = get_next_funtion_h_c(c_info, s_info, bay_info, next, g_c_s, d_c, f_c_s, w_c_s, next_options, next_option_found);
-        } else if (next_selection == "highest due date value") {
-            next = get_next_highest_due_date_value(c_info, s_info, next, d_c, f_c_s, next_options, next_option_found);
-        } else {
-            if (next_option_found) {
-                next = (int) next_options[0];
+            if (!deadlock) {
+                if (c_info[c][3] == 0) {
+                    next_option_found = true;
+                    next_options_set.add(c);
+                    deadlock = false;
+                }
             } else {
-                next = 0;
+                if (c_info[c][3] == 0 && deadlock_next[c] != c+1) {
+                    next_option_found = true;
+                    next_options_set.add(c);
+                }
             }
         }
-        return next;
+        if (next_option_found) {
+            Object[] next_options = next_options_set.toArray();
+            if (next_selection == "function h_c") {
+                next = get_next_funtion_h_c(next, d_c, w_c_s, next_options, next_option_found);
+            } else if (next_selection == "highest due date value") {
+                next = get_next_highest_due_date_value(next, d_c, next_options, next_option_found);
+            }
+        } else {
+            System.out.println("DEADLOCK! No next_option found.");
+            System.exit(0);
+        }
     }
 
-    private static Object[] relocate_next(int[][] c_info, int[][] s_info, int next, int[] d_c, boolean same_stack_under, int[] same_stack_below) {
-        if (!same_stack_under) {
+    private static void relocate_next() {
+        if (next_to_stopover_stack_prevent_deadlock) {
+            int block = next;
+            int prio = c_info[next][2];
+            int next_stack = stopover_stack_prevent_deadlock;
+
+            relocate(block, prio, next_stack);
+            next_to_stopover_stack_prevent_deadlock = false;
+        } else if (!same_stack_under) {
             int block = next;
             int prio = c_info[next][2];
             int next_stack = d_c[next];
 
-            Object [] rueckgabe = relocate(s_info, c_info, block, prio, next_stack);
-            s_info = (int[][]) rueckgabe[0];
-            c_info = (int[][]) rueckgabe[1];
+            relocate(block, prio, next_stack);
         } else {
             //wenn s gleich ds und noch ein Block unter c umgelagert werden muss bevor c an Zielstelle gelangt, muss c erst in einen anderen Block
             //erst stack für below aussuchen, da c nur zu nächstem Stack sollte
@@ -240,16 +257,20 @@ public class PreMarshallingJovanovic {
                     int minimum_stack_height = tiers;
                     for (int s = 0; s < stacks; s++) {
                         if (s != c_info[same_stack_below[c]][0] && (s_info_help[s][0] + 1) < tiers) {
-                            if (s_info_help[s][0] < minimum_stack_height) {
-                                minimum_stack_height = s_info_help[s][0];
-                                stack_options.clear();
-                                stack_options.add(s);
-                            } else if (s_info_help[s][0] == minimum_stack_height) {
-                                stack_options.add(s);
+                            if (! ((s_info_help[s][0] + 2) == tiers && stacks == 3)) {
+                                if (s_info_help[s][0] < minimum_stack_height) {
+                                    minimum_stack_height = s_info_help[s][0];
+                                    stack_options.clear();
+                                    stack_options.add(s);
+                                } else if (s_info_help[s][0] == minimum_stack_height) {
+                                    stack_options.add(s);
+                                }
                             }
                         }
                     }
-                    if (stack_options.size() == 1 || !consider_time) {
+                    if (stack_options.size() == 0) {
+                        deadlock = true;
+                    } else if (stack_options.size() == 1 || !consider_time) {
                         selected_stack[c] = stack_options.first();
                     } else if (consider_time) {
                         double time_to_destination_stack = 1000000;
@@ -266,81 +287,124 @@ public class PreMarshallingJovanovic {
 
                 }
                 //da Umlagerung noch nicht direkt durchgeführt wird, muss sichergestellt werden, dass nicht mehr Blöcke als möglich in einen Stack hinein umgelagert werden
-                s_info_help[selected_stack[c]][0] += 1;
+                if (stack_options.size() != 0) {
+                    s_info_help[selected_stack[c]][0] += 1;
+                }
             }
             System.out.println("selected_stack: " + Arrays.toString(selected_stack));
 
-            //next in nächsten Stack s umgelagern, der keinem der Stacks aus selected_stack[] entspricht (am besten der nächste Platz)
-            double time_to_stopover_stack = 100000;
-            int stopover_stack = 0;
-            for (int s = 0; s < stacks; s++) {
-                //prüft, ob s einem der selected_stacks für same_stack_below-Blöcke entspricht
-                //TODO: einfacher mit Methode (contains) prüfen ob in selected_stacks enthalten
-                boolean selected_stacks_contains_s = false;
-                for (int ss = 0; ss < selected_stack.length; ss++) {
-                    if (s == selected_stack[ss]) {
-                        selected_stacks_contains_s = true;
-                        break;
-                    }
-                }
-                //stopover_stack darf weder einem der selected_stacks für same_stack_below-Blöcke, noch dem destination stack entsprechen
-                //außerdem darf stopover_stack nicht voll sein
-                if (!selected_stacks_contains_s && s != d_c[next] && s_info[s][0] < tiers-1) {
-                    if (consider_time) {
-                        double time_to_stopover_stack_option = (double) Math.abs(c_info[next][0] - s) * 2.4 + (double) ((tiers - c_info[next][1]) + (tiers - (s_info[s][0]))) * 15.0;
-                        if (time_to_stopover_stack_option < time_to_stopover_stack) {
-                            time_to_stopover_stack = time_to_stopover_stack_option;
-                            stopover_stack = s;
+            if (!deadlock) {
+                //next in nächsten Stack s umgelagern, der keinem der Stacks aus selected_stack[] entspricht (am besten der nächste Platz)
+                double time_to_stopover_stack = 100000;
+                int stopover_stack = 0;
+                for (int s = 0; s < stacks; s++) {
+                    //prüft, ob s einem der selected_stacks für same_stack_below-Blöcke entspricht
+                    //TODO: einfacher mit Methode (contains) prüfen ob in selected_stacks enthalten
+                    boolean selected_stacks_contains_s = false;
+                    for (int ss = 0; ss < selected_stack.length; ss++) {
+                        if (s == selected_stack[ss]) {
+                            selected_stacks_contains_s = true;
+                            break;
                         }
-                    } else {
-                        stopover_stack = s;
-                        break; //TODO: klappt das? oder "break outer;"?
+                    }
+                    //stopover_stack darf weder einem der selected_stacks für same_stack_below-Blöcke, noch dem destination stack entsprechen
+                    //außerdem darf stopover_stack nicht voll sein
+                    if (!selected_stacks_contains_s && s != d_c[next] && s_info[s][0] < tiers - 1) {
+                        if (consider_time) {
+                            double time_to_stopover_stack_option = (double) Math.abs(c_info[next][0] - s) * 2.4 + (double) ((tiers - c_info[next][1]) + (tiers - (s_info[s][0]))) * 15.0;
+                            if (time_to_stopover_stack_option < time_to_stopover_stack) {
+                                time_to_stopover_stack = time_to_stopover_stack_option;
+                                stopover_stack = s;
+                            }
+                        } else {
+                            stopover_stack = s;
+                            s = stacks;
+                            break; //TODO: klappt das? oder "break outer;"?
+                        }
                     }
                 }
-            }
-            //next in stopover_stack umlagern
-            int block = next;
-            int prio = c_info[block][2];
-            int next_stack = stopover_stack;
+                //next in stopover_stack umlagern
+                int block = next;
+                int prio = c_info[block][2];
+                int next_stack = stopover_stack;
 
-            Object [] rueckgabe = relocate(s_info, c_info, block, prio, next_stack);
-            s_info = (int[][]) rueckgabe[0];
-            c_info = (int[][]) rueckgabe[1];
+                relocate(block, prio, next_stack);
 
-            //jeweils Block c aus same_stack_below[c] in selected_stack[c] umlagern
-            for (int c = 0; c < same_stack_below.length; c++) {
-                block = same_stack_below[c];
+                //jeweils Block c aus same_stack_below[c] in selected_stack[c] umlagern
+                for (int c = 0; c < same_stack_below.length; c++) {
+                    block = same_stack_below[c];
+                    prio = c_info[block][2];
+                    next_stack = selected_stack[c];
+
+                    relocate(block, prio, next_stack);
+                }
+
+                //next von stopover_stack in ds umlagern
+                block = next;
                 prio = c_info[block][2];
-                next_stack = selected_stack[c];
+                next_stack = d_c[next];
 
-                rueckgabe = relocate(s_info, c_info, block, prio, next_stack);
-                s_info = (int[][]) rueckgabe[0];
-                c_info = (int[][]) rueckgabe[1];
+                relocate(block, prio, next_stack);
             }
-
-            //next von stopover_stack in ds umlagern
-            block = next;
-            prio = c_info[block][2];
-            next_stack = d_c[next];
-
-            rueckgabe = relocate(s_info, c_info, block, prio, next_stack);
-            s_info = (int[][]) rueckgabe[0];
-            c_info = (int[][]) rueckgabe[1];
         }
-        return new Object[] {s_info, c_info};
     }
 
-    private static Object[] relocate_blocking_blocks(int[][] c_info, int[][] s_info, int next, int[] d_c, int[] order_relocations, boolean same_stack_over) {
+    private static void relocate_blocking_blocks() {
+        get_selected_stacks();
+
+        if (!(next_to_stopover_stack_prevent_deadlock || deadlock)) {
+            //relocation durchführen in order_relocation und Updates
+            for (int c = 0; c < order_relocations.length; c++) {
+                int block = order_relocations[c];
+                int prio = c_info[block][2];
+                int next_stack = selected_stacks[c];
+
+                relocate(block, prio, next_stack);
+            }
+        } else if (next_to_stopover_stack_prevent_deadlock && !deadlock) {
+            relocate_next();
+            get_selected_stacks();
+            if (!(next_to_stopover_stack_prevent_deadlock || deadlock)) {
+                //relocation durchführen in order_relocation und Updates
+                for (int c = 0; c < order_relocations.length; c++) {
+                    int block = order_relocations[c];
+                    int prio = c_info[block][2];
+                    int next_stack = selected_stacks[c];
+
+                    relocate(block, prio, next_stack);
+                }
+            }
+        }
+    }
+
+    private static void get_selected_stacks() {
+        int [][] s_info_help = new int [stacks][2];
+        for (int s = 0; s < stacks; s++) {
+            s_info_help[s][0] = s_info[s][0];
+            s_info_help[s][1] = s_info[s][1];
+        }
+        selected_stacks = new int [order_relocations.length];
+        stopover_stack_prevent_deadlock = 0;
         for (int c = 0; c < order_relocations.length; c++) {
-            int selected_stack = 0;
             TreeSet<Integer> stack_options = new TreeSet<>();
             if (stack_selection == "The Lowest Position") {
                 int minimum_stack_height = tiers;
-                for(int s = 0; s < stacks; s++) {
+                for (int s = 0; s < stacks; s++) {
                     //prüfen, ob s nicht (gleich ds und Blöcke über next liegen)
-                    if (! (same_stack_over && s == c_info[order_relocations[c]][0])) {
+                    if (!(same_stack_over && s == c_info[order_relocations[c]][0])) {
                         //prüfen, ob s nicht gleich aktueller stack, s nicht gleich ds von next und ob stack schon voll
-                        if (s != c_info[order_relocations[c]][0] && s != d_c[next] && (s_info[s][0] + 1) < tiers) {
+                        if (s != c_info[next][0] && s != c_info[order_relocations[c]][0] && s != d_c[next] && (s_info_help[s][0] + 1) < tiers) {
+                            if (s_info_help[s][0] < minimum_stack_height) {
+                                minimum_stack_height = s_info_help[s][0];
+                                stack_options.clear();
+                                stack_options.add(s);
+                            } else if (s_info_help[s][0] == minimum_stack_height) {
+                                stack_options.add(s);
+                            }
+                        }
+                        //prüfen, ob prio von c zwischen next und Block unter destination Platz und liegt genügend Platz in ds
+                        /*
+                        else if ((c_info[order_relocations[c]][2] >= c_info[next][2]) && (c_info[order_relocations[c]][2] <= copy[s][s_info[s][0]][1]) && ((s_info[s][0] + 2) < tiers)) {
                             if (s_info[s][0] < minimum_stack_height) {
                                 minimum_stack_height = s_info[s][0];
                                 stack_options.clear();
@@ -349,57 +413,68 @@ public class PreMarshallingJovanovic {
                                 stack_options.add(s);
                             }
                         }
-                        //prüfen, ob prio von c zwischen next und Block unter destination Platz und liegt genügend Platz in ds
-                            /*
-                            else if ((c_info[order_relocations[c]][2] >= c_info[next][2]) && (c_info[order_relocations[c]][2] <= copy[s][s_info[s][0]][1]) && ((s_info[s][0] + 2) < tiers)) {
-                                if (s_info[s][0] < minimum_stack_height) {
-                                    minimum_stack_height = s_info[s][0];
-                                    stack_options.clear();
-                                    stack_options.add(s);
-                                } else if (s_info[s][0] == minimum_stack_height) {
-                                    stack_options.add(s);
-                                }
-                            }
-                            */ //TODO: prüfen, ob nicht doch umsetzbar (im Original nicht berücksichtigt), zu berücksichtigen ist, ob umzulagernder Block in s oder ds
+                        */ //TODO: prüfen, ob nicht doch umsetzbar (im Original nicht berücksichtigt), zu berücksichtigen ist, ob umzulagernder Block in s oder ds
                         //könnte wie bei stopover_stack zwischengelagert werden, wenn in ds noch nicht alle blockierenden Blöcke frei sind bzw. muss sicherlich zwischengelagert werden,
                         //denn wenn es wird aus beiden Stacks immer niedrigste Prio (hohe Zahl) gewählt, um umgelagert zu werden
                     }
                 }
-                if (stack_options.size() == 1 || !consider_time) {
-                    selected_stack = stack_options.first();
-                } else if (consider_time){
-                    double time_to_destination_stack = 1000000;
-                    for (int stack: stack_options) {
-                        double time_to_destination_stack_option = (double) Math.abs(c_info[order_relocations[c]][0] - stack) * 2.4 + (double) ((tiers - c_info[order_relocations[c]][1]) + (tiers - (s_info[stack][0]))) * 15.0;
-                        if (time_to_destination_stack_option < time_to_destination_stack) {
-                            selected_stack = stack;
+                if (stack_options.size() == 0) {
+                    //relocate next to stopover_stack first before continuing with relocations
+                    if (c_info[next][1] != tiers-1) {
+                        if (copy[c_info[next][0]][c_info[next][1] + 1][0] == 0) {
+                            next_to_stopover_stack_prevent_deadlock = true;
+                            boolean stopover_stack_found = false;
+                            for (int s = 0; s < stacks; s++) {
+                                if (s != d_c[next] && s != c_info[next][0] && s_info[s][0] != tiers-1) {
+                                    stopover_stack_prevent_deadlock = s;
+                                    stopover_stack_found = true;
+                                    c = order_relocations.length;
+                                    break;
+                                    //TODO: hier könnte time berücksichtigt werden
+                                }
+                            }
+                            if (!stopover_stack_found) {
+                                deadlock = true;
+                                c = order_relocations.length;
+                            }
+                        } else {
+                            deadlock = true;
+                            c = order_relocations.length;
+                        }
+                    } else {
+                        next_to_stopover_stack_prevent_deadlock = true;
+                        for (int s = 0; s < stacks; s++) {
+                            if (s != d_c[next] && s != c_info[next][0]) {
+                                stopover_stack_prevent_deadlock = s;
+                                relocate_next();
+                                break;
+                                //TODO: hier könnte time berücksichtigt werden
+                            }
                         }
                     }
+
+                } else if (stack_options.size() == 1 || !consider_time) {
+                    selected_stacks[c] = stack_options.first();
+                    s_info_help[selected_stacks[c]][0] += 1;
+                } else if (consider_time) {
+                    double time_to_destination_stack = 1000000;
+                    for (int stack : stack_options) {
+                        double time_to_destination_stack_option = (double) Math.abs(c_info[order_relocations[c]][0] - stack) * 2.4 + (double) ((tiers - c_info[order_relocations[c]][1]) + (tiers - (s_info_help[stack][0]))) * 15.0;
+                        if (time_to_destination_stack_option < time_to_destination_stack) {
+                            selected_stacks[c] = stack;
+                        }
+                    }
+                    s_info_help[selected_stacks[c]][0] += 1;
                 }
             } else if (stack_selection == "Lowest Priority Index") {
 
             } else if (stack_selection == "MinMax") {
 
             }
-            System.out.println("relocation: " + order_relocations[c] + " to stack " + selected_stack);
-
-            //relocation durchführen in order_relocation und Updates
-            //TODO: Blöcke fliegen (Zuweisung zuvor falsch)
-            int block = order_relocations[c];
-            int prio = c_info[block][2];
-            int next_stack = selected_stack;
-
-            Object [] rueckgabe = relocate(s_info, c_info, block, prio, next_stack);
-            s_info = (int[][]) rueckgabe[0];
-            c_info = (int[][]) rueckgabe[1];
         }
-        return new Object[] {s_info, c_info};
     }
 
-    private static Object[] compute__order_relocations__same_stack_below(int[][] c_info, int[][] s_info, int next, boolean same_stack, boolean same_stack_over, boolean same_stack_under, int[] d_c, int[][] g_c_s, int[][] f_c_s) {
-        int [] order_relocations;
-        int [] same_stack_below;
-
+    private static void compute__order_relocations__same_stack_below(int next) {
         //order in which blocks are relocated (indices)
         //current stack
         int stack_s = c_info[next][0];
@@ -466,10 +541,9 @@ public class PreMarshallingJovanovic {
             }
 
         }
-        return new Object[] {order_relocations, same_stack_below, same_stack, same_stack_over, same_stack_under};
     }
 
-    private static int get_next_highest_due_date_value(int[][] c_info, int[][] s_info, int next, int[] d_c, int[][] f_c_s, Object[] next_options, boolean next_option_found) {
+    private static int get_next_highest_due_date_value(int next, int[] d_c, Object[] next_options, boolean next_option_found) {
         int highest_due_date = 0;
         double time_to_destination_stack = 1000000;
         if (next_option_found) {
@@ -493,12 +567,12 @@ public class PreMarshallingJovanovic {
         return next;
     }
 
-    private static int get_next_funtion_h_c(int[][] c_info, int[][] s_info, int[][] bay_info, int next, int[][] g_c_s, int[] d_c, int[][] f_c_s, int[][] w_c_s, Object[] next_options, boolean next_option_found) {
+    private static int get_next_funtion_h_c(int next, int[] d_c, int[][] w_c_s, Object[] next_options, boolean next_option_found) {
         //number of forced relocations: in this approximation, a forced relocation occurs only if a block c is being relocated and all of the top stack due date values are larger than p(c)
         //if all blocks in a stack are well located we shall consider the stack having due date value zero
         int[] fr_c_s = new int[containers];
         //TODO: werden im Paper nur forced relocations aus stack s oder auch aus destination stack ss betrachtet? -> hier werden beide betrachtet (Option mit oder ohne?)
-        fr_c_s = compute_fr_c_s(c_info, s_info, bay_info, g_c_s, fr_c_s, d_c, f_c_s, next_options);
+        fr_c_s = compute_fr_c_s(fr_c_s, d_c, next_options);
         //System.out.println("fr_c_s: " + Arrays.toString(fr_c_s));
 
         int[] h_c = new int[containers];
@@ -535,7 +609,7 @@ public class PreMarshallingJovanovic {
         return next;
     }
 
-    private static int[] compute_fr_c_s(int[][] c_info, int[][] s_info, int[][] bay_info, int[][] g_c_s, int[] fr_c_s, int[] d_c, int[][] f_c_s, Object[] next_options) {
+    private static int[] compute_fr_c_s(int[] fr_c_s, int[] d_c, Object[] next_options) {
         //wenn es zwei empty stacks gibt, kann es keine forced relocations geben
         if (! (bay_info[3][1] == -1 && bay_info[4][0] == -1)) {
             for (int cc = 0; cc < next_options.length; cc++) {
@@ -595,7 +669,7 @@ public class PreMarshallingJovanovic {
         return fr_c_s;
     }
 
-    private static int[] compute_d_c(int[][] c_info, int[][] s_info, int[][] f_c_s, int[][] w_c_s, int[]d_c) {
+    private static void compute_d_c() {
         for(int c = 0; c < containers; c++) {
             //Liste mit den Indizes der niedrigsten w_c_s erstellen, um dann Distanzen zu vergleichen
             int lowest_w_c_s = 100000;
@@ -628,10 +702,9 @@ public class PreMarshallingJovanovic {
                 d_c[c] = indices_sorted.first();
             }
         }
-        return d_c;
     }
 
-    private static Object[] compute__f_c_s__nw_c_s(int[][] c_info, int[][] f_c_s, int[][] nw_c_s) {
+    private static void compute__f_c_s__nw_c_s() {
         for(int c = 0; c < c_info.length; c++) {
             int prio_c = c_info[c][2];
             for(int s = 0; s < stacks; s++) {
@@ -655,10 +728,9 @@ public class PreMarshallingJovanovic {
                 }
             }
         }
-        return new Object [] {f_c_s, nw_c_s};
     }
 
-    private static int[][] compute_bay_info(int[][] s_info, int[][] bay_info) {
+    private static void compute_bay_info() {
         int empty_stacks_count = 0;
         for (int s = 0; s < stacks; s++) {
             if (s_info[s][1] == 1) {
@@ -695,10 +767,9 @@ public class PreMarshallingJovanovic {
                 }
             }
         }
-        return bay_info;
     }
 
-    private static Object[] compute__c_info__s_info__g_c_s(int[][] c_info, int[][] s_info, int[][] g_c_s) {
+    private static void compute__c_info__s_info__g_c_s() {
         for(int s = 0; s < stacks; s++) {
             int containers_above_c = 0;
             boolean highest_tier_found = false;
@@ -727,7 +798,6 @@ public class PreMarshallingJovanovic {
             }
             s_info[s][1] = tier_ordered ? 1 : 0;
         }
-        return new Object[] {c_info, s_info, g_c_s};
     }
 
     private static int[][][] copy_bay(int[][][] initial_bay, int[][][] current_bay) {
@@ -741,22 +811,21 @@ public class PreMarshallingJovanovic {
         return current_bay;
     }
 
-    private static int [][][] compute_if_well_located(int[][][] current_bay) {
+    private static void compute_if_well_located(int [][][] bay) {
         for(int s = 0; s < stacks; s++) {
             for(int t = 0; t < tiers; t++) {
                 if (t == 0) {
-                    current_bay[s][t][2] = 1;
-                } else if(current_bay[s][t][1] > current_bay[s][t-1][1] || current_bay[s][t-1][2] == 0) {
-                    current_bay[s][t][2] = 0;
-                } else if(current_bay[s][t][1] <= current_bay[s][t-1][1] && current_bay[s][t-1][2] == 1) {
-                    current_bay[s][t][2] = 1;
+                    bay[s][t][2] = 1;
+                } else if(bay[s][t][1] > bay[s][t-1][1] || bay[s][t-1][2] == 0) {
+                    bay[s][t][2] = 0;
+                } else if(bay[s][t][1] <= bay[s][t-1][1] && bay[s][t-1][2] == 1) {
+                    bay[s][t][2] = 1;
                 }
             }
         }
-        return current_bay;
     }
 
-    private static Object[] relocate(int[][] s_info, int[][] c_info, int block, int prio, int next_stack) {
+    private static void relocate(int block, int prio, int next_stack) {
         boolean next_stack_sorted = (s_info[next_stack][1] == 1);
         int next_tier = s_info[next_stack][0] + 1;
         int prio_next_stack;
@@ -773,11 +842,12 @@ public class PreMarshallingJovanovic {
         } else {
             prev_stack_sorted = true;
         }
-        if (block == 3) {
-            int a = 3;
-        }
 
         System.out.println("Block " + block + " from stack " + prev_stack + " to stack " + next_stack);
+        if (prev_tier != tiers-1 && copy[prev_stack][prev_tier+1][0] != 0) {
+            System.out.println("Illegal move!");
+            System.exit(0);
+        }
 
         copy[next_stack][next_tier][0] = block + 1;
         copy[next_stack][next_tier][1] = prio;
@@ -813,24 +883,22 @@ public class PreMarshallingJovanovic {
         System.out.println("current_bay: " + Arrays.deepToString(copy));
         System.out.println("c_info: " + Arrays.deepToString(c_info));
         System.out.println("s_info: " + Arrays.deepToString(s_info));
-
-        return new Object [] {s_info, c_info};
     }
 
-    private static Object [] get_initial_bay(String initial_bay_path) throws FileNotFoundException {
+    private static void get_initial_bay(String initial_bay_path) throws FileNotFoundException {
         Scanner scanner = new Scanner(new File(initial_bay_path));
 
         scanner.nextLine();
         scanner.nextLine();
         scanner.nextLine();
         scanner.next();
-        int tiers = scanner.nextInt();
+        tiers = scanner.nextInt();
         System.out.println("Tiers: " + tiers);
         scanner.next();
-        int stacks = scanner.nextInt();
+        stacks = scanner.nextInt();
         System.out.println("Stacks: " + stacks);
         scanner.next();
-        int containers = scanner.nextInt();
+        containers = scanner.nextInt();
         System.out.println("Containers: " + containers);
         scanner.nextLine();
 
@@ -852,9 +920,6 @@ public class PreMarshallingJovanovic {
                 number_container++;
             }
         }
-        //System.out.println(Arrays.deepToString(initial_bay));
-
-        return new Object[] {initial_bay, stacks, tiers, containers};
     }
 
 }
