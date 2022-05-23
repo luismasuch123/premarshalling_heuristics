@@ -1,6 +1,7 @@
 Name: ../../instances/emm_s4_t4_p0.5_c0
 Description: ../../instances/emm_s4_t4_p0.5_c0
 
+Bays: 1
 Tiers: 5
 Stacks: 3
 Containers: 10
