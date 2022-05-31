@@ -4,7 +4,7 @@ import java.util.*;
 
 public class PreMarshallingJovanovic {
 
-    static String method = "Huang";
+    static String method = "Huang"; //"Jovanovic", "Huang"
     static boolean consider_time;
     static boolean multiple_bays;
 
@@ -16,6 +16,7 @@ public class PreMarshallingJovanovic {
     static int step = 0;
     static double time_relocations = 0; //keine Leerfahrten berücksichtigt, ohne Lastaufnahme und -abgabe
     static double time_total = 0; //ohne Lastaufnahme und -abgabe
+    //TODO: Methode zur Distanzberechnung erstellen
 
     //Jovanovic
     static String next_selection;
@@ -26,7 +27,7 @@ public class PreMarshallingJovanovic {
 
 
     public static void main (String [] args) throws FileNotFoundException {
-        String initial_bay_path = "/Users/luismasuchibanez/IdeaProjects/premarshalling_heuristics/data/Test/bay2.bay";
+        String initial_bay_path = "/Users/luismasuchibanez/IdeaProjects/premarshalling_heuristics/data/Test/emm_s10_t4_p1_c0_16.bay";
         consider_time = true;
         multiple_bays = true;
 
@@ -138,6 +139,7 @@ public class PreMarshallingJovanovic {
         while(!Params.sorted) {
             relocations_on_hold = new TreeSet<>();
             step++;
+            int relocation_count_current = Relocation.relocations_count;
             System.out.println("Step " + step);
             System.out.println("Current bay: " + Arrays.deepToString(current_bay));
 
@@ -151,9 +153,36 @@ public class PreMarshallingJovanovic {
             //complete the high R stacks (Stacks, die geordnet sind und deren Höhe mindestens beta * h ist
             Params.complete_high_R_stacks(copy, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
             current_bay = BayInstance.copy_bay(Relocation.copy, current_bay, stacks, tiers);
+            Relocation.copy = BayInstance.copy_bay(current_bay, Relocation.copy, stacks, tiers);
+            Params.check_sorted(stacks);
+
+            //complete the low R stacks
+            if (!Params.sorted) {
+                Params.complete_low_R_stacks(copy, current_bay, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
+            }
+            Params.check_sorted(stacks);
+
+            //deconstruct the low R stacks
+            if (!Params.sorted) {
+                Params.deconstruct_low_R_stacks(copy, current_bay, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
+            }
+
+            if (!Params.sorted) {
+                Params.move_W_to_empty_stack(copy, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
+            }
+
+            //wenn alle R stacks voll sind und sonst nur W stacks existieren, dann kleinsten W stack zu empty stack machen?!
+            if (relocation_count_current == Relocation.relocations_count) {
+                Params.create_empty_stack(copy, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
+            }
+
+            current_bay = BayInstance.copy_bay(Relocation.copy, current_bay, stacks, tiers);
 
             Params.check_sorted(stacks);
-            Params.sorted = true;
+            if (relocation_count_current == Relocation.relocations_count) {
+                System.out.println("No feasible relocation found!");
+                System.exit(0);
+            }
         }
         return current_bay;
     }
