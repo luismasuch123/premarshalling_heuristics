@@ -14,6 +14,7 @@ public class PreMarshallingJovanovic {
     static TreeSet<Relocation> relocations_on_hold;
 
     static int step = 0;
+    static int relocation_count_current;
     static double time_relocations = 0; //keine Leerfahrten berücksichtigt, ohne Lastaufnahme und -abgabe
     static double time_total = 0; //ohne Lastaufnahme und -abgabe
     //TODO: Methode zur Distanzberechnung erstellen
@@ -28,8 +29,8 @@ public class PreMarshallingJovanovic {
 
     public static void main (String [] args) throws FileNotFoundException {
         String initial_bay_path = "/Users/luismasuchibanez/IdeaProjects/premarshalling_heuristics/data/Test/emm_s10_t4_p1_c0_16.bay";
-        consider_time = true;
-        multiple_bays = true;
+        consider_time = false;
+        multiple_bays = false;
 
         //Jovanovic
         next_selection = "function h_c"; //"highest due date value"
@@ -37,7 +38,7 @@ public class PreMarshallingJovanovic {
         stack_filling = "None"; //"None", "Standard", "Safe", "Stop"
 
         //Huang
-        Params.beta = 0.2;
+        Params.beta = 0.1; //scheint am besten zu sein wenn beta_h <= 1
 
         try {
             BayInstance instance = BayInstance.get_initial_bay(initial_bay_path, multiple_bays);
@@ -139,7 +140,7 @@ public class PreMarshallingJovanovic {
         while(!Params.sorted) {
             relocations_on_hold = new TreeSet<>();
             step++;
-            int relocation_count_current = Relocation.relocations_count;
+            relocation_count_current = Relocation.relocations_count;
             System.out.println("Step " + step);
             System.out.println("Current bay: " + Arrays.deepToString(current_bay));
 
@@ -153,7 +154,7 @@ public class PreMarshallingJovanovic {
             //complete the high R stacks (Stacks, die geordnet sind und deren Höhe mindestens beta * h ist
             Params.complete_high_R_stacks(copy, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
             current_bay = BayInstance.copy_bay(Relocation.copy, current_bay, stacks, tiers);
-            Relocation.copy = BayInstance.copy_bay(current_bay, Relocation.copy, stacks, tiers);
+            //Relocation.copy = BayInstance.copy_bay(current_bay, Relocation.copy, stacks, tiers);
             Params.check_sorted(stacks);
 
             //complete the low R stacks
@@ -174,6 +175,7 @@ public class PreMarshallingJovanovic {
             //wenn alle R stacks voll sind und sonst nur W stacks existieren, dann kleinsten W stack zu empty stack machen?!
             if (relocation_count_current == Relocation.relocations_count) {
                 Params.create_empty_stack(copy, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
+                //TODO: hier Anpassung vornehmen in create_empty_stack
             }
 
             current_bay = BayInstance.copy_bay(Relocation.copy, current_bay, stacks, tiers);
