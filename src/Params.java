@@ -466,11 +466,15 @@ public class Params {
                     Params.compute__c_info__s_info(copy, stacks, tiers);
                     c_info = Params.c_info;
                     s_info = Params.s_info;
+                    //Wenn die relocations rückgängig gemacht werden, müssen sie auch aus relocations_on_hold gelöscht werden
+                    PreMarshallingJovanovic.relocations_on_hold.clear();
                 } else {
                     System.out.println("Next_stack_R " + next_stack_R +" does reach or exceed beta_h " + beta_h + ".");
                     next_stack_R_checked[next_stack_R] = 1;
                     PreMarshallingJovanovic.current_bay = BayInstance.copy_bay(Relocation.copy, current_bay, stacks, tiers);
                     current_bay = BayInstance.copy_bay(Relocation.copy, current_bay, stacks, tiers);
+                    PreMarshallingJovanovic.relocations.addAll(PreMarshallingJovanovic.relocations_on_hold);
+
                     //copy = BayInstance.copy_bay(current_bay, Relocation.copy, stacks, tiers);
                     Params.compute__c_info__s_info(copy, stacks, tiers);
                     //TODO: Zuweisungen s_info und c_info notwendig?
@@ -490,8 +494,6 @@ public class Params {
             //compute giving low R stack
             next_stack_R_low_found = false;
             TreeSet<Integer> stack_options_R_low = new TreeSet<>();
-            //TODO: sicherstellen, dass nicht der stack ausgewählt wird, der in der letzten Iteration befüllt wurde
-            //TODO: Problem, dass low_R stacks mit sehr niedriger Prio zurückbleiben, die nicht befüllt werden können -> zunächst low_R mit niedriger Prio deconstructen? -> kann recht sicher auf stack in R umgelagert werden
             int next_stack_R_low_prio = 100000;
             for (int s = 0; s < stacks; s++) {
                 if (s_info[s][0] != -1 && s_info[s][1] == 1 && s_info[s][0] < beta_h && s_info[s][0] != tiers - 1 && next_stack_R_low_checked[s] == 0 && s != c_info[Relocation.prev_block][0] && copy[s][s_info[s][0]][1] < next_stack_R_low_prio) {
@@ -554,9 +556,11 @@ public class Params {
                         int candidate_block = copy[next_stack_R_low][s_info[next_stack_R_low][0]][0] - 1;
                         Relocation.relocate(c_info, s_info, candidate_block, next_stack_R_low_prio, next_stack_R_deconstruct, tiers, stacks_per_bay, multiple_bays);
                         current_bay = BayInstance.copy_bay(Relocation.copy, current_bay, stacks, tiers);
+                        PreMarshallingJovanovic.relocations.addAll(PreMarshallingJovanovic.relocations_on_hold);
 
-                        //TODO: muss hier complete_low_R_stacks so angepasst werden bzw. neue Funktion, dass nur completed, wenn stack wirklich voll wird?
                         Params.complete_low_R_stacks(copy, current_bay, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
+                        PreMarshallingJovanovic.relocations.addAll(PreMarshallingJovanovic.relocations_on_hold);
+
                         if (s_info[next_stack_R_low][0] == -1 || s_info[next_stack_R_low][0] >= beta_h) {
                             if (s_info[next_stack_R_low][0] == -1) {
                                 move_W_to_empty_stack(copy, c_info, s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
@@ -620,8 +624,11 @@ public class Params {
                                 int candidate_block = copy[next_stack_R_low][s_info[next_stack_R_low][0]][0] - 1;
                                 Relocation.relocate(c_info, s_info, candidate_block, next_stack_R_low_prio, next_stack_W_deconstruct, tiers, stacks_per_bay, multiple_bays);
                                 current_bay = BayInstance.copy_bay(Relocation.copy, current_bay, stacks, tiers);
+                                PreMarshallingJovanovic.relocations.addAll(PreMarshallingJovanovic.relocations_on_hold);
 
                                 Params.complete_low_R_stacks(copy, current_bay, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
+                                PreMarshallingJovanovic.relocations.addAll(PreMarshallingJovanovic.relocations_on_hold);
+
                                 if (s_info[next_stack_R_low][0] == -1 || s_info[next_stack_R_low][0] >= beta_h) {
                                     if (s_info[next_stack_R_low][0] == -1) {
                                         move_W_to_empty_stack(copy, c_info, s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
@@ -799,7 +806,7 @@ public class Params {
                 } else {
                     stacks_checked[W_stack_source] = 1;
                     PreMarshallingJovanovic.current_bay = BayInstance.copy_bay(Relocation.copy, PreMarshallingJovanovic.current_bay, stacks, tiers);
-                    Relocation.copy = BayInstance.copy_bay(PreMarshallingJovanovic.current_bay, Relocation.copy, stacks, tiers);
+                    Relocation.copy = BayInstance.copy_bay(PreMarshallingJovanovic.current_bay, Relocation.copy, stacks, tiers); //TODO: überflüssig?
                 }
             }
         }
@@ -881,7 +888,7 @@ public class Params {
                     } else {
                         stacks_checked[W_stack_source] = 1;
                         PreMarshallingJovanovic.current_bay = BayInstance.copy_bay(Relocation.copy, PreMarshallingJovanovic.current_bay, stacks, tiers);
-                        Relocation.copy = BayInstance.copy_bay(PreMarshallingJovanovic.current_bay, Relocation.copy, stacks, tiers);
+                        Relocation.copy = BayInstance.copy_bay(PreMarshallingJovanovic.current_bay, Relocation.copy, stacks, tiers); //TODO: überflüssig
                     }
                 }
             }

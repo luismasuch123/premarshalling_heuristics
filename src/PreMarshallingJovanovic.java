@@ -4,7 +4,7 @@ import java.util.*;
 
 public class PreMarshallingJovanovic {
 
-    static String method = "Huang"; //"Jovanovic", "Huang"
+    static String method = "Jovanovic"; //"Jovanovic", "Huang"
     static boolean consider_time;
     static boolean multiple_bays;
 
@@ -29,8 +29,8 @@ public class PreMarshallingJovanovic {
 
     public static void main (String [] args) throws FileNotFoundException {
         String initial_bay_path = "/Users/luismasuchibanez/IdeaProjects/premarshalling_heuristics/data/Test/emm_s10_t4_p1_c0_16.bay";
-        consider_time = false;
-        multiple_bays = false;
+        consider_time = true;
+        multiple_bays = true;
 
         //Jovanovic
         next_selection = "function h_c"; //"highest due date value"
@@ -38,7 +38,7 @@ public class PreMarshallingJovanovic {
         stack_filling = "None"; //"None", "Standard", "Safe", "Stop"
 
         //Huang
-        Params.beta = 0.1; //scheint am besten zu sein wenn beta_h <= 1
+        Params.beta = 0.2; //scheint am besten zu sein wenn beta_h <= 1
 
         try {
             BayInstance instance = BayInstance.get_initial_bay(initial_bay_path, multiple_bays);
@@ -73,13 +73,11 @@ public class PreMarshallingJovanovic {
                 if (Relocation.deadlock_count > 0) {
                     System.out.println("Deadlocks: " + Relocation.deadlock_count);
                 }
-                /*
                 Iterator<Relocation> it = relocations.iterator();
                 while(it.hasNext()){
                     System.out.println((it.next()).toString());
                 }
-                 */
-
+                System.out.println("Number relocations: " + relocations.size());
             } else {
                 int stacks = instance.stacks_per_bay;
                 int stacks_per_bay = instance.stacks_per_bay;
@@ -99,7 +97,7 @@ public class PreMarshallingJovanovic {
                     if (method == "Jovanovic") {
                         final_bay = premarshall_Jovanovic(initial_bay, stacks, stacks_per_bay, tiers, containers, Relocation.order_relocations, Relocation.same_stack_under, Relocation.same_stack_below);
                     } else if (method == "Huang") {
-
+                        final_bay = premarshall_Huang(initial_bay, stacks, stacks_per_bay, tiers, containers);
                     }
 
                     System.out.println("Final bay: " + Arrays.deepToString(final_bay));
@@ -118,10 +116,11 @@ public class PreMarshallingJovanovic {
                 System.out.println("Time_total in h: " + time_total);
 
                 Iterator<Relocation> it = relocations.iterator();
+                int i = 1;
                 while(it.hasNext()){
                     System.out.println((it.next()).toString());
                 }
-
+                System.out.println("Number relocations: " + relocations.size());
             }
         } catch (FileNotFoundException e) {
             System.out.println(("File not found!"));
@@ -157,8 +156,11 @@ public class PreMarshallingJovanovic {
             //Relocation.copy = BayInstance.copy_bay(current_bay, Relocation.copy, stacks, tiers);
             Params.check_sorted(stacks);
 
+            relocations.addAll(relocations_on_hold); //relocations hinzufügen, da sonst auch die bisherigen zulässigen relocations gelöscht werden, bei complete the low R stacks
+
             //complete the low R stacks
             if (!Params.sorted) {
+                //TODO: bei Statistiken berücksichtigen, dass relocations rückgängig gemacht werden oder überflüssig, wenn sowieso simuliert?
                 Params.complete_low_R_stacks(copy, current_bay, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
             }
             Params.check_sorted(stacks);
@@ -172,13 +174,13 @@ public class PreMarshallingJovanovic {
                 Params.move_W_to_empty_stack(copy, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
             }
 
-            //wenn alle R stacks voll sind und sonst nur W stacks existieren, dann kleinsten W stack zu empty stack machen?!
+            //wenn alle R stacks voll sind und sonst nur W stacks existieren, dann kleinsten W stack zu empty stack machen
             if (relocation_count_current == Relocation.relocations_count) {
                 Params.create_empty_stack(copy, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
-                //TODO: hier Anpassung vornehmen in create_empty_stack
             }
 
             current_bay = BayInstance.copy_bay(Relocation.copy, current_bay, stacks, tiers);
+            relocations.addAll(relocations_on_hold);
 
             Params.check_sorted(stacks);
             if (relocation_count_current == Relocation.relocations_count) {
@@ -220,7 +222,6 @@ public class PreMarshallingJovanovic {
             //System.out.println("bay_info: " + Arrays.deepToString(bay_info));
             //System.out.println("g_c_s: " + Arrays.deepToString(g_c_s));
 
-            //TODO: wirklich larger or same due date value?
             Params.f_c_s = new int[containers][stacks];
             Params.nw_c_s = new int[containers][stacks];
             Params.compute__f_c_s__nw_c_s(copy, stacks, tiers);
@@ -267,6 +268,7 @@ public class PreMarshallingJovanovic {
                 System.out.println("deadlock_next: " + Arrays.toString(Relocation.deadlock_next));
                 Relocation.deadlock_count++;
                 Relocation.copy = BayInstance.copy_bay(current_bay, copy, stacks, tiers);
+                relocations_on_hold.clear();
             }
 
             //filling
@@ -280,6 +282,11 @@ public class PreMarshallingJovanovic {
             Params.check_sorted(stacks);
         }
         //TODO: Corrections -> auf Set relocations durchführen, kann wohl bei filling auftreten, sonst eher selten
+        Iterator<Relocation> it = relocations.iterator();
+        while(it.hasNext()){
+            System.out.println((it.next()).toString());
+        }
+
         return current_bay;
     }
 }
