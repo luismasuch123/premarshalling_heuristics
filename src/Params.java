@@ -464,8 +464,8 @@ public class Params {
                     next_stack_R_checked[next_stack_R] = 1;
                     copy = BayInstance.copy_bay(current_bay, Relocation.copy, stacks, tiers);
                     Params.compute__c_info__s_info(copy, stacks, tiers);
-                    c_info = Params.c_info;
-                    s_info = Params.s_info;
+                    //c_info = Params.c_info;
+                    //s_info = Params.s_info;
                     //Wenn die relocations rückgängig gemacht werden, müssen sie auch aus relocations_on_hold gelöscht werden
                     PreMarshallingJovanovic.relocations_on_hold.clear();
                 } else {
@@ -475,11 +475,10 @@ public class Params {
                     current_bay = BayInstance.copy_bay(Relocation.copy, current_bay, stacks, tiers);
                     PreMarshallingJovanovic.relocations.addAll(PreMarshallingJovanovic.relocations_on_hold);
 
-                    //copy = BayInstance.copy_bay(current_bay, Relocation.copy, stacks, tiers);
-                    Params.compute__c_info__s_info(copy, stacks, tiers);
+                    //Params.compute__c_info__s_info(copy, stacks, tiers);
                     //TODO: Zuweisungen s_info und c_info notwendig?
-                    c_info = Params.c_info;
-                    s_info = Params.s_info;
+                    //c_info = Params.c_info;
+                    //s_info = Params.s_info;
                 }
             }
         }
@@ -648,7 +647,6 @@ public class Params {
     }
 
     public static void move_W_to_empty_stack(int [][][] copy, int [][] c_info, int [][] s_info, int stacks, int stacks_per_bay, int tiers, boolean multiple_bays, boolean consider_time) {
-        //TODO: bei der Auswahl des empty stacks time-Berücksichtigung möglich bzw. sinnvoll?
         boolean empty_stack_found = false;
         int empty_stack = 0;
         TreeSet<Integer> stack_options_empty = new TreeSet<>();
@@ -673,23 +671,31 @@ public class Params {
         }
         if (empty_stack_found) {
             boolean block_in_W_found = true;
-            //TODO: letzte Bedingung in while Aufweichen , weil Prio 1 auf 1 immer noch in Ordnung wäre, lieber sicher stellen, dass Prio kleiner sein muss?!
-            while (block_in_W_found && !(s_info[empty_stack][0] == tiers-1)) {
+            while (block_in_W_found && s_info[empty_stack][0] != tiers-1) {
                 int W_block = 0;
                 int biggest_prio_among_W = 0;
                 int W_stack_height = 0;
                 block_in_W_found = false;
-                //TODO: consider_time
+                TreeSet<Integer> W_options = new TreeSet<>();
                 for (int s = 0; s < stacks; s++) {
                     if (s_info[s][1] == 0 && s_info[empty_stack][0] == -1) {
                         block_in_W_found = true;
                         if (copy[s][s_info[s][0]][1] > biggest_prio_among_W) {
                             W_block = copy[s][s_info[s][0]][0] - 1;
                             W_stack_height = s_info[s][0];
+                            W_options.clear();
+                            W_options.add(W_block);
                             biggest_prio_among_W = copy[s][s_info[s][0]][1];
                         } else if (copy[s][s_info[s][0]][1] == biggest_prio_among_W && W_stack_height < s_info[s][0]) {
                             W_block = copy[s][s_info[s][0]][0] - 1;
                             W_stack_height = s_info[s][0];
+                            W_options.clear();
+                            W_options.add(W_block);
+                            biggest_prio_among_W = copy[s][s_info[s][0]][1];
+                        } else if (copy[s][s_info[s][0]][1] == biggest_prio_among_W && W_stack_height == s_info[s][0]) {
+                            W_block = copy[s][s_info[s][0]][0] - 1;
+                            W_stack_height = s_info[s][0];
+                            W_options.add(W_block);
                             biggest_prio_among_W = copy[s][s_info[s][0]][1];
                         }
                     } else if (s_info[s][1] == 0 && copy[s][s_info[s][0]][1] <= copy[empty_stack][s_info[empty_stack][0]][1]) {
@@ -697,16 +703,38 @@ public class Params {
                         if (copy[s][s_info[s][0]][1] > biggest_prio_among_W) {
                             W_block = copy[s][s_info[s][0]][0] - 1;
                             W_stack_height = s_info[s][0];
+                            W_options.clear();
+                            W_options.add(W_block);
                             biggest_prio_among_W = copy[s][s_info[s][0]][1];
                         } else if (copy[s][s_info[s][0]][1] == biggest_prio_among_W && W_stack_height < s_info[s][0]) {
                             W_block = copy[s][s_info[s][0]][0] - 1;
                             W_stack_height = s_info[s][0];
+                            W_options.clear();
+                            W_options.add(W_block);
+                            biggest_prio_among_W = copy[s][s_info[s][0]][1];
+                        } else if (copy[s][s_info[s][0]][1] == biggest_prio_among_W && W_stack_height == s_info[s][0]) {
+                            W_block = copy[s][s_info[s][0]][0] - 1;
+                            W_stack_height = s_info[s][0];
+                            W_options.add(W_block);
                             biggest_prio_among_W = copy[s][s_info[s][0]][1];
                         }
                     }
                 }
-                if (block_in_W_found) {
+                if (block_in_W_found && !consider_time) {
                     System.out.println("Move containers in W to empty stack!");
+                    W_block = W_options.first();
+                    int W_block_prio = c_info[W_block][2];
+                    Relocation.relocate(c_info, s_info, W_block, W_block_prio, empty_stack, tiers, stacks_per_bay, multiple_bays);
+                } else if (block_in_W_found && consider_time) {
+                    System.out.println("Move containers in W to empty stack!");
+                    double time_to_empty_stack = 1000000;
+                    for (int block : W_options) {
+                        double time_to_empty_stack_option = (double) Math.abs(empty_stack / stacks_per_bay - c_info[block][0] / stacks_per_bay) * 2 * 1.875 + (double) Math.abs(empty_stack % stacks_per_bay - c_info[block][0] % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - s_info[empty_stack][0]) + (tiers - s_info[c_info[block][0]][0])) * 2 * 15.0;
+                        if (time_to_empty_stack_option < time_to_empty_stack) {
+                            W_block = block;
+                            time_to_empty_stack = time_to_empty_stack_option;
+                        }
+                    }
                     int W_block_prio = c_info[W_block][2];
                     Relocation.relocate(c_info, s_info, W_block, W_block_prio, empty_stack, tiers, stacks_per_bay, multiple_bays);
                 }
@@ -765,14 +793,6 @@ public class Params {
                         stack_options_W.add(s);
                     }
                 }
-                /* //TODO: consider_time bei dieser Option von Nachteil! Warum?
-                for (int s = 0; s < stacks; s++) {
-                    if (s_info[s][0] != tiers-1 && s != W_stack_source && s_info[s][1] == 0 && copy[s][s_info[s][0]][1] <= copy[W_stack_source][source_height][1]) {
-                        stack_destination_found = true;
-                        stack_options_W.add(s);
-                    }
-                }
-                 */
                 if (stack_options_W.size() == 0) {
                     stacks_checked[W_stack_source] = 1;
                 } else if (stack_options_W.size() == 1 || !consider_time) {
@@ -806,12 +826,10 @@ public class Params {
                 } else {
                     stacks_checked[W_stack_source] = 1;
                     PreMarshallingJovanovic.current_bay = BayInstance.copy_bay(Relocation.copy, PreMarshallingJovanovic.current_bay, stacks, tiers);
-                    Relocation.copy = BayInstance.copy_bay(PreMarshallingJovanovic.current_bay, Relocation.copy, stacks, tiers); //TODO: überflüssig?
                 }
             }
         }
         if (PreMarshallingJovanovic.relocation_count_current == Relocation.relocations_count || all_W_stacks_exhausted) {
-            //TODO: wenn keine Umlagerung in anderen W stack möglich, dann Umlagerung in R stack ermöglichen
             stack_source_found = true;
             stacks_checked = new int[stacks];
             while (stack_source_found) {
@@ -888,7 +906,6 @@ public class Params {
                     } else {
                         stacks_checked[W_stack_source] = 1;
                         PreMarshallingJovanovic.current_bay = BayInstance.copy_bay(Relocation.copy, PreMarshallingJovanovic.current_bay, stacks, tiers);
-                        Relocation.copy = BayInstance.copy_bay(PreMarshallingJovanovic.current_bay, Relocation.copy, stacks, tiers); //TODO: überflüssig
                     }
                 }
             }

@@ -25,6 +25,7 @@ public class PreMarshallingJovanovic {
     static String stack_filling;
 
     //Huang
+    static boolean correction;
 
 
     public static void main (String [] args) throws FileNotFoundException {
@@ -38,6 +39,7 @@ public class PreMarshallingJovanovic {
         stack_filling = "None"; //"None", "Standard", "Safe", "Stop"
 
         //Huang
+        correction = false;
         Params.beta = 0.2; //scheint am besten zu sein wenn beta_h <= 1
 
         try {
@@ -160,7 +162,6 @@ public class PreMarshallingJovanovic {
 
             //complete the low R stacks
             if (!Params.sorted) {
-                //TODO: bei Statistiken berücksichtigen, dass relocations rückgängig gemacht werden oder überflüssig, wenn sowieso simuliert?
                 Params.complete_low_R_stacks(copy, current_bay, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
             }
             Params.check_sorted(stacks);
@@ -188,6 +189,11 @@ public class PreMarshallingJovanovic {
                 System.exit(0);
             }
         }
+        //Corrections bei Huang nur als Option bereitstellen (im Original nicht dabei)
+        if (correction) {
+            correction();
+        }
+
         return current_bay;
     }
 
@@ -273,7 +279,7 @@ public class PreMarshallingJovanovic {
 
             //filling
             if (!Relocation.deadlock) {
-                Relocation.stack_filling_Jovanovic(Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, stack_filling, multiple_bays);
+                Relocation.stack_filling_Jovanovic(Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, stack_filling, multiple_bays, consider_time);
                 relocations.addAll(relocations_on_hold);
             }
 
@@ -281,12 +287,47 @@ public class PreMarshallingJovanovic {
 
             Params.check_sorted(stacks);
         }
-        //TODO: Corrections -> auf Set relocations durchführen, kann wohl bei filling auftreten, sonst eher selten
-        Iterator<Relocation> it = relocations.iterator();
-        while(it.hasNext()){
-            System.out.println((it.next()).toString());
-        }
+
+        correction();
 
         return current_bay;
+    }
+
+    private static void correction() {
+        Relocation last = new Relocation(0, 0, 0, 0, 0, 0);
+        int [] last_relocation_count = new int[relocations.size()];
+        boolean correction_needed = true;
+        while(correction_needed) {
+            correction_needed = false;
+            Iterator<Relocation> it = relocations.iterator();
+            while (it.hasNext() && !correction_needed) {
+                Relocation next = it.next();
+                if (next.block == last.block) {
+                    correction_needed = true;
+                    int relocations_count = next.relocation_count;
+                    int block = next.block;
+                    int prev_stack = last.prev_stack;
+                    int next_stack = next.next_stack;
+                    int prev_tier = last.prev_tier;
+                    int next_tier = next.next_tier;
+                    last_relocation_count[last.relocation_count] = 1;
+                    it.remove();
+                    if (prev_stack != next_stack) {
+                        relocations.add(new Relocation(relocations_count, block, prev_stack, next_stack, prev_tier, next_tier));
+                    }
+                }
+                last = next;
+            }
+            if (correction_needed) {
+                Iterator<Relocation> itt = relocations.iterator();
+                boolean correction_done = false;
+                while (itt.hasNext() && correction_needed && !correction_done) {
+                    if (last_relocation_count[itt.next().relocation_count] == 1) {
+                        itt.remove();
+                        correction_done = true;
+                    }
+                }
+            }
+        }
     }
 }
