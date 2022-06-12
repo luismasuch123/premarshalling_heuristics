@@ -1,4 +1,3 @@
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.*;
 
@@ -17,7 +16,6 @@ public class PreMarshallingJovanovic {
     static int relocation_count_current;
     static double time_relocations = 0; //keine Leerfahrten berücksichtigt, ohne Lastaufnahme und -abgabe
     static double time_total = 0; //ohne Lastaufnahme und -abgabe
-    //TODO: Methode zur Distanzberechnung erstellen
 
     //Jovanovic
     static String next_selection;
@@ -57,9 +55,9 @@ public class PreMarshallingJovanovic {
                 Params.check_sorted_pre(initial_bay, stacks, tiers);
 
                 int [][][] final_bay = new int [stacks][tiers][3];
-                if (method == "Jovanovic") {
+                if (method.equals("Jovanovic")) {
                     final_bay = premarshall_Jovanovic(initial_bay, stacks, stacks_per_bay, tiers, containers, Relocation.order_relocations, Relocation.same_stack_under, Relocation.same_stack_below);
-                } else if (method == "Huang") {
+                } else if (method.equals("Huang")) {
                     final_bay = premarshall_Huang(initial_bay, stacks, stacks_per_bay, tiers, containers);
                 }
 
@@ -75,9 +73,8 @@ public class PreMarshallingJovanovic {
                 if (Relocation.deadlock_count > 0) {
                     System.out.println("Deadlocks: " + Relocation.deadlock_count);
                 }
-                Iterator<Relocation> it = relocations.iterator();
-                while(it.hasNext()){
-                    System.out.println((it.next()).toString());
+                for (Relocation relocation : relocations) {
+                    System.out.println(relocation.toString());
                 }
                 System.out.println("Number relocations: " + relocations.size());
             } else {
@@ -96,9 +93,9 @@ public class PreMarshallingJovanovic {
                     Params.check_sorted_pre(initial_bay, stacks, tiers);
 
                     int [][][] final_bay = new int [stacks][tiers][3];
-                    if (method == "Jovanovic") {
+                    if (method.equals("Jovanovic")) {
                         final_bay = premarshall_Jovanovic(initial_bay, stacks, stacks_per_bay, tiers, containers, Relocation.order_relocations, Relocation.same_stack_under, Relocation.same_stack_below);
-                    } else if (method == "Huang") {
+                    } else if (method.equals("Huang")) {
                         final_bay = premarshall_Huang(initial_bay, stacks, stacks_per_bay, tiers, containers);
                     }
 
@@ -117,10 +114,8 @@ public class PreMarshallingJovanovic {
                 System.out.println("Time_relocations in h: " + time_relocations);
                 System.out.println("Time_total in h: " + time_total);
 
-                Iterator<Relocation> it = relocations.iterator();
-                int i = 1;
-                while(it.hasNext()){
-                    System.out.println((it.next()).toString());
+                for (Relocation relocation : relocations) {
+                    System.out.println(relocation.toString());
                 }
                 System.out.println("Number relocations: " + relocations.size());
             }

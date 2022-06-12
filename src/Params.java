@@ -1,11 +1,10 @@
 import java.util.HashSet;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.WeakHashMap;
 
 public class Params {
 
-    static int [][] bay_info = new int [5][2]; //1st/2nd and 3rd highest top stack due date value of not well located stacks (prio and stack) and -1 at position 4 and/or 5 if there are empyty stacks
+    static int [][] bay_info = new int [5][2]; //1st/2nd and 3rd highest top stack due date value of not well located stacks (prio and stack) and -1 at position 4 and/or 5 if there are empty stacks
     static int [][] s_info; //highest tier, ordered
     static int [][] c_info; //stack, tier, prio, sorted
     static boolean sorted;
@@ -50,6 +49,7 @@ public class Params {
         for (int s = 0; s < stacks; s++) {
             if (s_info[s][1] == 0) {
                 sorted = false;
+                s = stacks;
             }
         }
     }
@@ -77,8 +77,8 @@ public class Params {
     public static int[] compute_fr_c_s(int [][][] copy, int[] fr_c_s, int[] d_c, Object[] next_options) {
         //wenn es zwei empty stacks gibt, kann es keine forced relocations geben
         if (! (bay_info[3][1] == -1 && bay_info[4][0] == -1)) {
-            for (int cc = 0; cc < next_options.length; cc++) {
-                int c = (int) next_options[cc];
+            for (Object next_option : next_options) {
+                int c = (int) next_option;
                 //wenn es mindestens einen empty stack gibt, dann kann es aus current stack heraus keine forced relocation geben
                 if (bay_info[3][1] == 0) {
                     //in current stack
@@ -138,7 +138,7 @@ public class Params {
         for(int c = 0; c < containers; c++) {
             //Liste mit den Indizes der niedrigsten w_c_s erstellen, um dann Distanzen zu vergleichen
             int lowest_w_c_s = 100000;
-            Set<Integer> indices = new HashSet<Integer>();
+            Set<Integer> indices = new HashSet<>();
             for(int s = 0; s < stacks; s++) {
                 //Stack steht nur zur Auswahl, wenn nicht (voll und geordnet)
                 if (! (s_info[s][0] == tiers-1 && copy[s][tiers-1][2] == 1)) {
@@ -169,9 +169,8 @@ public class Params {
         }
     }
 
-    private static double get_time(int stack_from, int stack_to, int tier_from, int tier_to, int tiers, int stacks_per_bay) {
-        double time_to = (double) Math.abs(stack_from/stacks_per_bay - stack_to/stacks_per_bay) * 2 * 1.875 + (double) Math.abs(stack_from % stacks_per_bay - stack_to % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - tier_from) + (tiers - tier_to)) * 2 * 15.0;
-        return time_to;
+    public static double get_time(int stack_from, int stack_to, int tier_from, int tier_to, int tiers, int stacks_per_bay) {
+        return (double) Math.abs(stack_from/stacks_per_bay - stack_to/stacks_per_bay) * 2 * 1.875 + (double) Math.abs(stack_from % stacks_per_bay - stack_to % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - tier_from) + (tiers - tier_to)) * 2 * 15.0;
     }
 
     public static void compute__f_c_s__nw_c_s(int [][][] copy, int stacks, int tiers) {
@@ -337,8 +336,7 @@ public class Params {
             if (stack_options_R.size() != 0 && (stack_options_R.size() == 1 || !consider_time)) {
                 next_stack_R = stack_options_R.first();
             } else if (stack_options_R.size() != 0 && consider_time) { //Zeit von prev_block zu next_stack_R berücksichtigen
-                next_stack_R = compute_nearest_stack(stack_options_R, tiers, stacks_per_bay);
-
+                next_stack_R = compute_nearest_stack(stack_options_R, tiers, stacks_per_bay, c_info[Relocation.prev_block][0], s_info[c_info[Relocation.prev_block][0]][0], 0);
             }
             if (next_stack_R_found) {
                 boolean next_stack_W_found = true;
@@ -365,7 +363,7 @@ public class Params {
                     } else if (stack_options_W.size() == 1 || !consider_time) {
                         next_stack_W = stack_options_W.first();
                     } else if (consider_time) { // falls mehrere giving stacks möglich, denjenigen mit der geringsten Entfernung zu receiving stack wählen
-                        next_stack_W = compute_nearest_stack(stack_options_W, tiers, stacks_per_bay);
+                        next_stack_W = compute_nearest_stack(stack_options_W, tiers, stacks_per_bay, next_stack_R, s_info[next_stack_R][0], 0);
                     }
                     if (next_stack_R_found && next_stack_W_found) {
                         System.out.println("Complete high R stack!");
@@ -378,11 +376,32 @@ public class Params {
         }
     }
 
-    public static int compute_nearest_stack(TreeSet<Integer> stack_options_R, int tiers, int stacks_per_bay) {
+    public static int compute_nearest_stack(TreeSet<Integer> stack_options, int tiers, int stacks_per_bay, int stack_from, int tier_from, int tier_to) {
         int next_stack = 0;
         double time_to_next_stack_R = 1000000;
-        for (int stack : stack_options_R) {
-            double time_to_next_stack_R_option = get_time(c_info[Relocation.prev_block][0], stack, s_info[c_info[Relocation.prev_block][0]][0], s_info[stack][0], tiers, stacks_per_bay);
+        for (int stack : stack_options) {
+            if (tier_to == 0) {
+                tier_to = s_info[stack][0];
+            } else if (tier_to == 1){
+                tier_to = c_info[stack][1];
+            }
+            double time_to_next_stack_R_option = get_time(stack_from, stack, tier_from, tier_to, tiers, stacks_per_bay);
+            if (time_to_next_stack_R_option < time_to_next_stack_R) {
+                next_stack = stack;
+                time_to_next_stack_R = time_to_next_stack_R_option;
+            }
+        }
+        return next_stack;
+    }
+
+    public static int compute_nearest_stack(TreeSet<Integer> stack_options, int tiers, int stacks_per_bay, int stack_from, int tier_from, int tier_to, int [][] s_info_help) {
+        int next_stack = 0;
+        double time_to_next_stack_R = 1000000;
+        for (int stack : stack_options) {
+            if (tier_to == 0) {
+                tier_to = s_info_help[stack][0];
+            }
+            double time_to_next_stack_R_option = get_time(stack_from, stack, tier_from, tier_to, tiers, stacks_per_bay);
             if (time_to_next_stack_R_option < time_to_next_stack_R) {
                 next_stack = stack;
                 time_to_next_stack_R = time_to_next_stack_R_option;
@@ -410,7 +429,7 @@ public class Params {
             if (stack_options_R.size() != 0 && (stack_options_R.size() == 1 || !consider_time)) {
                 next_stack_R = stack_options_R.first();
             } else if (stack_options_R.size() != 0 && consider_time) { //Zeit von prev_block zu next_stack_R berücksichtigen
-                next_stack_R = compute_nearest_stack(stack_options_R, tiers, stacks_per_bay);
+                next_stack_R = compute_nearest_stack(stack_options_R, tiers, stacks_per_bay, c_info[Relocation.prev_block][0], s_info[c_info[Relocation.prev_block][0]][0], 0);
             }
             if (next_stack_R_found) {
                 next_stack_W_found = true;
@@ -437,7 +456,7 @@ public class Params {
                     } else if (stack_options_W.size() == 1 || !consider_time) {
                         next_stack_W = stack_options_W.first();
                     } else if (consider_time) { // falls mehrere giving stacks möglich, denjenigen mit der geringsten Entfernung zu receiving stack wählen
-                        next_stack_W = compute_nearest_stack(stack_options_W, tiers, stacks_per_bay);
+                        next_stack_W = compute_nearest_stack(stack_options_W, tiers, stacks_per_bay, next_stack_R, s_info[next_stack_R][0], 0);
                     }
                     if (next_stack_R_found && next_stack_W_found) {
                         System.out.println("Complete low R stack!");
@@ -498,7 +517,7 @@ public class Params {
             if (stack_options_R_low.size() != 0 && (stack_options_R_low.size() == 1 || !consider_time)) {
                 next_stack_R_low = stack_options_R_low.first();
             } else if (stack_options_R_low.size() != 0 && consider_time) { //Zeit von prev_block zu next_stack_R berücksichtigen
-                next_stack_R_low = compute_nearest_stack(stack_options_R_low, tiers, stacks_per_bay);
+                next_stack_R_low = compute_nearest_stack(stack_options_R_low, tiers, stacks_per_bay, c_info[Relocation.prev_block][0], s_info[c_info[Relocation.prev_block][0]][0], 0);
             }
             if (next_stack_R_low_found && s_info[next_stack_R_low][0] != -1) {
                 boolean next_stack_R_found = true;
@@ -525,7 +544,7 @@ public class Params {
                     } else if (stack_options_R.size() == 1 || !consider_time) {
                         next_stack_R_deconstruct = stack_options_R.first();
                     } else if (consider_time) { // falls mehrere giving stacks möglich, denjenigen mit der geringsten Entfernung zu receiving stack wählen
-                        next_stack_R_deconstruct = compute_nearest_stack(stack_options_R, tiers, stacks_per_bay);
+                        next_stack_R_deconstruct = compute_nearest_stack(stack_options_R, tiers, stacks_per_bay, next_stack_R_low, s_info[next_stack_R_low][0], 0);
                     }
                     if (next_stack_R_low_found && next_stack_R_found) {
                         System.out.println("Deconstruct low R stack! Move from R_low to R.");
@@ -586,7 +605,7 @@ public class Params {
                             } else if (stack_options_W.size() == 1 || !consider_time) {
                                 next_stack_W_deconstruct = stack_options_W.first();
                             } else if (consider_time) { // falls mehrere giving stacks möglich, denjenigen mit der geringsten Entfernung zu receiving stack wählen
-                                next_stack_W_deconstruct = compute_nearest_stack(stack_options_W, tiers, stacks_per_bay);
+                                next_stack_W_deconstruct = compute_nearest_stack(stack_options_W, tiers, stacks_per_bay, next_stack_R_low, s_info[next_stack_R_low][0], 0);
                             }
                             if (next_stack_R_low_found && next_stack_W_found) {
                                 System.out.println("Deconstruct low R stack! Move from R_low to W.");
@@ -630,12 +649,12 @@ public class Params {
         if (stack_options_empty.size() != 0 && (stack_options_empty.size() == 1 || !consider_time)) {
             empty_stack = stack_options_empty.first();
         } else if (stack_options_empty.size() != 0 && consider_time) { //Zeit von prev_block zu next_stack_R berücksichtigen
-            empty_stack = compute_nearest_stack(stack_options_empty, tiers, stacks_per_bay);
+            empty_stack = compute_nearest_stack(stack_options_empty, tiers, stacks_per_bay, c_info[Relocation.prev_block][0], s_info[c_info[Relocation.prev_block][0]][0], 0);
         }
         if (empty_stack_found) {
             boolean block_in_W_found = true;
             while (block_in_W_found && s_info[empty_stack][0] != tiers-1) {
-                int W_block = 0;
+                int W_block;
                 int biggest_prio_among_W = 0;
                 int W_stack_height = 0;
                 block_in_W_found = false;
@@ -690,7 +709,7 @@ public class Params {
                     Relocation.relocate(c_info, s_info, W_block, W_block_prio, empty_stack, tiers, stacks_per_bay, multiple_bays);
                 } else if (block_in_W_found && consider_time) {
                     System.out.println("Move containers in W to empty stack!");
-                    W_block = compute_nearest_stack(W_options, tiers, stacks_per_bay);
+                    W_block = compute_nearest_stack(W_options, tiers, stacks_per_bay, empty_stack, s_info[empty_stack][0], 1);
                     int W_block_prio = c_info[W_block][2];
                     Relocation.relocate(c_info, s_info, W_block, W_block_prio, empty_stack, tiers, stacks_per_bay, multiple_bays);
                 }
@@ -722,7 +741,7 @@ public class Params {
             if (stack_options_empty.size() != 0 && (stack_options_empty.size() == 1 || !consider_time)) {
                 W_stack_source = stack_options_empty.first();
             } else if (stack_options_empty.size() != 0 && consider_time) { //Zeit von prev_block zu next_stack_R berücksichtigen
-                W_stack_source = compute_nearest_stack(stack_options_empty, tiers, stacks_per_bay);
+                W_stack_source = compute_nearest_stack(stack_options_empty, tiers, stacks_per_bay, c_info[Relocation.prev_block][0], s_info[c_info[Relocation.prev_block][0]][0], 0);
             }
             boolean stack_destination_found = true;
             while (stack_source_found && stack_destination_found && s_info[W_stack_source][0] != -1) {
@@ -747,7 +766,7 @@ public class Params {
                 } else if (stack_options_W.size() == 1 || !consider_time) {
                     W_stack_destination = stack_options_W.first();
                 } else if (consider_time) {
-                    W_stack_destination = compute_nearest_stack(stack_options_W, tiers, stacks_per_bay);
+                    W_stack_destination = compute_nearest_stack(stack_options_W, tiers, stacks_per_bay, W_stack_source, s_info[W_stack_source][0], 0);
                 }
                 if (stack_destination_found) {
                     int block = copy[W_stack_source][s_info[W_stack_source][0]][0] - 1;
@@ -762,6 +781,7 @@ public class Params {
                         for (int s = 0; s < stacks; s++) {
                             if (s != W_stack_source && s_info[s][1] == 0 && s_info[s][0] != tiers-1) {
                                 all_W_stacks_exhausted = false;
+                                s = stacks;
                             }
                         }
                     }
@@ -794,7 +814,7 @@ public class Params {
                     if (stack_options_empty.size() != 0 && (stack_options_empty.size() == 1 || !consider_time)) {
                         W_stack_source = stack_options_empty.first();
                     } else if (stack_options_empty.size() != 0 && consider_time) { //Zeit von prev_block zu next_stack_R berücksichtigen
-                        W_stack_source = compute_nearest_stack(stack_options_empty, tiers, stacks_per_bay);
+                        W_stack_source = compute_nearest_stack(stack_options_empty, tiers, stacks_per_bay, c_info[Relocation.prev_block][0], s_info[c_info[Relocation.prev_block][0]][0], 0);
                     }
                 }
                 boolean stack_destination_found = true;
@@ -820,7 +840,7 @@ public class Params {
                     } else if (stack_options_W.size() == 1 || !consider_time) {
                         W_stack_destination = stack_options_W.first();
                     } else if (consider_time) {
-                        W_stack_destination = compute_nearest_stack(stack_options_W, tiers, stacks_per_bay);
+                        W_stack_destination = compute_nearest_stack(stack_options_W, tiers, stacks_per_bay, W_stack_source, s_info[W_stack_source][0], 0);
                     }
                     if (stack_destination_found) {
                         int block = copy[W_stack_source][s_info[W_stack_source][0]][0] - 1;

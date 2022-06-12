@@ -41,6 +41,8 @@ public class Relocation implements Comparable<Relocation> {
         this.next_tier = next_tier;
     }
 
+    //TODO: in compute_nearest_stack auslagern
+
     @Override
     public int compareTo(Relocation r) {
         return Integer.compare(relocation_count, r.relocation_count);
@@ -170,13 +172,7 @@ public class Relocation implements Comparable<Relocation> {
                 } else if (stack_options.size() == 1 || !consider_time) {
                     selected_stack[c] = stack_options.first();
                 } else if (consider_time) {
-                    double time_to_destination_stack = 1000000;
-                    for (int stack : stack_options) {
-                        double time_to_destination_stack_option = (double) Math.abs(c_info[same_stack_below[c]][0]/stacks_per_bay - stack/stacks_per_bay) * 2 * 1.875 + (double) Math.abs(c_info[same_stack_below[c]][0] % stacks_per_bay - stack % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - c_info[same_stack_below[c]][1]) + (tiers - (s_info_help[stack][0]))) * 2 * 15.0;
-                        if (time_to_destination_stack_option < time_to_destination_stack) {
-                            selected_stack[c] = stack;
-                        }
-                    }
+                    selected_stack[c] = Params.compute_nearest_stack(stack_options, tiers, stacks_per_bay, c_info[same_stack_below[c]][0], c_info[same_stack_below[c]][1], 0);
                 }
                 //da Umlagerung noch nicht direkt durchgeführt wird, muss sichergestellt werden, dass nicht mehr Blöcke als möglich in einen Stack hinein umgelagert werden
                 if (stack_options.size() != 0) {
@@ -202,7 +198,7 @@ public class Relocation implements Comparable<Relocation> {
                     //außerdem darf stopover_stack nicht voll sein
                     if (!selected_stacks_contains_s && s != d_c[next_block] && s_info[s][0] < tiers - 1) {
                         if (consider_time) {
-                            double time_to_stopover_stack_option = (double) Math.abs(c_info[next_block][0]/stacks_per_bay - s/stacks_per_bay) * 2 * 1.875+ (double) Math.abs(c_info[next_block][0] % stacks_per_bay - s % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - c_info[next_block][1]) + (tiers - (s_info[s][0]))) * 2 * 15.0;
+                            double time_to_stopover_stack_option = Params.get_time(c_info[next_block][0], s, c_info[next_block][1], s_info[s][0], tiers, stacks_per_bay);
                             if (time_to_stopover_stack_option < time_to_stopover_stack) {
                                 time_to_stopover_stack = time_to_stopover_stack_option;
                                 stopover_stack = s;
@@ -528,13 +524,7 @@ public class Relocation implements Comparable<Relocation> {
                         } else if (stopover_stack_options.size() == 1 || !consider_time) {
                             stopover_stack_prevent_deadlock = stopover_stack_options.first();
                         } else if (consider_time) {
-                            double time_to_stopover_stack = 1000000;
-                            for (int stack : stopover_stack_options) {
-                                double time_to_stopover_stack_option = (double) Math.abs(c_info[next_block][0]/stacks_per_bay - stack/stacks_per_bay) * 2 * 1.875 + (double) Math.abs(c_info[next_block][0] % stacks_per_bay - stack % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - c_info[next_block][1]) + (tiers - (s_info_help[stack][0]))) * 2 * 15.0;
-                                if (time_to_stopover_stack_option < time_to_stopover_stack) {
-                                    stopover_stack_prevent_deadlock = stack;
-                                }
-                            }
+                            stopover_stack_prevent_deadlock = Params.compute_nearest_stack(stopover_stack_options, tiers, stacks_per_bay, c_info[next_block][0], c_info[next_block][1], 0, s_info_help);
                         }
                     } else {
                         deadlock = true;
@@ -551,13 +541,7 @@ public class Relocation implements Comparable<Relocation> {
                     if (stopover_stack_options.size() == 1 || !consider_time) {
                         stopover_stack_prevent_deadlock = stopover_stack_options.first();
                     } else if (consider_time) {
-                        double time_to_stopover_stack = 1000000;
-                        for (int stack : stopover_stack_options) {
-                            double time_to_stopover_stack_option = (double) Math.abs(c_info[next_block][0]/stacks_per_bay - stack/stacks_per_bay) * 2 * 1.875 + (double) Math.abs(c_info[next_block][0] % stacks_per_bay - stack % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - c_info[next_block][1]) + (tiers - (s_info_help[stack][0]))) * 2 * 15.0;
-                            if (time_to_stopover_stack_option < time_to_stopover_stack) {
-                                stopover_stack_prevent_deadlock = stack;
-                            }
-                        }
+                        stopover_stack_prevent_deadlock = Params.compute_nearest_stack(stopover_stack_options, tiers, stacks_per_bay, c_info[next_block][0], c_info[next_block][1], 0, s_info_help);
                     }
                     if (stopover_stack_options.size() != 0) {
                         relocate_next_Jovanovic(c_info, s_info, d_c, stack_selection, consider_time, multiple_bays, stacks, tiers, stacks_per_bay);
@@ -569,13 +553,7 @@ public class Relocation implements Comparable<Relocation> {
                 s_info_help[selected_stacks[c]][0] += 1;
                 deadlock = false;
             } else if (consider_time) {
-                double time_to_destination_stack = 1000000;
-                for (int stack : stack_options) {
-                    double time_to_destination_stack_option = (double) Math.abs(c_info[order_relocations[c]][0]/stacks_per_bay - stack/stacks_per_bay) * 2 * 1.875 + (double) Math.abs(c_info[order_relocations[c]][0] % stacks_per_bay - stack % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - c_info[order_relocations[c]][1]) + (tiers - (s_info_help[stack][0]))) * 2 * 15.0;
-                    if (time_to_destination_stack_option < time_to_destination_stack) {
-                        selected_stacks[c] = stack;
-                    }
-                }
+                selected_stacks[c] = Params.compute_nearest_stack(stack_options, tiers, stacks_per_bay, c_info[order_relocations[c]][0], c_info[order_relocations[c]][1], 0, s_info_help);
                 s_info_help[selected_stacks[c]][0] += 1;
                 deadlock = false;
             }
@@ -634,22 +612,22 @@ public class Relocation implements Comparable<Relocation> {
         if (next_option_found) {
             for (int cc = 0; cc < next_options.length; cc++) {
                 int c = (int) next_options[cc];
-                double time_from_prev = (double) Math.abs(c_info[next][0]/stacks_per_bay - c_info[prev_block][0]/stacks_per_bay) * 2 * 1.875 + (double) Math.abs(c_info[next][0] % stacks_per_bay - c_info[prev_block][0] % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - s_info[c_info[next][0]][0]) + (tiers - c_info[prev_block][1])) * 2 * 15.0;
+                double time_from_prev = Params.get_time(c_info[next][0], c_info[prev_block][0], s_info[c_info[next][0]][0], c_info[prev_block][1], tiers, stacks_per_bay);
                 if (h_c[c] < min_value) {
                     next = c;
                     min_value = h_c[c];
                     if (s_info[d_c[next]][0] != -1) {
-                        time_to_destination_stack = time_from_prev + (double) Math.abs(c_info[next][0] / stacks_per_bay - d_c[next] / stacks_per_bay) * 2 * 1.875 + (double) Math.abs(c_info[next][0] % stacks_per_bay - d_c[next] % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - c_info[next][1]) + (tiers - (s_info[d_c[next]][0] - f_c_s[next][d_c[next]] + 1))) * 2 * 15.0;
+                        time_to_destination_stack = time_from_prev + Params.get_time(c_info[next][0], d_c[next], c_info[next][1], s_info[d_c[next]][0] - f_c_s[next][d_c[next]] + 1, tiers, stacks_per_bay);
                     } else {
-                        time_to_destination_stack = time_from_prev + (double) Math.abs(c_info[next][0] / stacks_per_bay - d_c[next] / stacks_per_bay) * 2 * 1.875 + (double) Math.abs(c_info[next][0] % stacks_per_bay - d_c[next] % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - c_info[next][1]) + tiers) * 2 * 15.0;
+                        time_to_destination_stack = time_from_prev + Params.get_time(c_info[next][0], d_c[next], c_info[next][1],0, tiers, stacks_per_bay);
                     }
                 } else if (consider_time && h_c[c] == min_value) {
                     int next_option = c;
                     double time_to_destination_stack_option;
                     if (s_info[d_c[next_option]][0] != -1) {
-                        time_to_destination_stack_option = time_from_prev + (double) Math.abs(c_info[next_option][0] / stacks_per_bay - d_c[next_option] / stacks_per_bay) * 2 * 1.875 + (double) Math.abs(c_info[next_option][0] % stacks_per_bay - d_c[next_option] % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - c_info[next_option][1]) + (tiers - (s_info[d_c[next_option]][0] - f_c_s[next_option][d_c[next_option]] + 1))) * 2 * 15.0;
+                        time_to_destination_stack_option = time_from_prev + Params.get_time(c_info[next_option][0], d_c[next_option], c_info[next_option][1], s_info[d_c[next_option]][0] - f_c_s[next_option][d_c[next_option]] + 1, tiers, stacks_per_bay);
                     } else {
-                        time_to_destination_stack_option = time_from_prev + (double) Math.abs(c_info[next_option][0] / stacks_per_bay - d_c[next_option] / stacks_per_bay) * 2 * 1.875 + (double) Math.abs(c_info[next_option][0] % stacks_per_bay - d_c[next_option] % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - c_info[next_option][1]) + tiers) * 2 * 15.0;
+                        time_to_destination_stack_option = time_from_prev + Params.get_time(c_info[next_option][0], d_c[next_option], c_info[next_option][1], 0, tiers, stacks_per_bay);
                     }
                     if (time_to_destination_stack_option < time_to_destination_stack) {
                         time_to_destination_stack = time_to_destination_stack_option;
@@ -661,7 +639,7 @@ public class Relocation implements Comparable<Relocation> {
                     }
                 }
             }
-            //warum ist die obere Methode bei 5 und 6 tiers schneller und bei 7 tiers langsamer? -> muss eig schneller seinn im Schnitt
+            //warum ist die obere Methode bei 5 und 6 tiers schneller und bei 7 tiers langsamer? -> muss eig schneller sein im Schnitt
             /*
             for (int cc = 0; cc < next_options.length; cc++) {
                 int c = (int) next_options[cc];
@@ -711,11 +689,11 @@ public class Relocation implements Comparable<Relocation> {
                 int c = (int) next_options[cc];
                 double time_from_prev = (double) Math.abs(c_info[next][0]/stacks_per_bay - c_info[prev_block][0]/stacks_per_bay) * 2 * 1.875 + (double) Math.abs(c_info[next][0] % stacks_per_bay - c_info[prev_block][0] % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - s_info[c_info[next][0]][0]) + (tiers - c_info[prev_block][1])) * 2 * 15.0;
                 if (c_info[c][2] > highest_due_date) {
-                    time_to_destination_stack = time_from_prev + (double) Math.abs(c_info[c][0]/stacks_per_bay - d_c[c]/stacks_per_bay) * 2 * 1.875 + (double) Math.abs(c_info[c][0] % stacks_per_bay - d_c[c] % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - c_info[c][1]) + (tiers - (s_info[d_c[c]][0] - f_c_s[c][d_c[c]]))) * 2 * 15.0;
+                    time_to_destination_stack = time_from_prev + Params.get_time(c_info[c][0], d_c[c], c_info[c][1], s_info[d_c[c]][0] - f_c_s[c][d_c[c]], tiers, stacks_per_bay);
                     highest_due_date = c_info[c][2];
                     next = c;
                 } else if (consider_time && c_info[c][2] == highest_due_date) {
-                    double time_to_destination_stack_option = time_from_prev + (double) Math.abs(c_info[c][0]/stacks_per_bay - d_c[c]/stacks_per_bay) * 2 * 1.875 + (double) Math.abs(c_info[c][0] % stacks_per_bay - d_c[c] % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - c_info[c][1]) + (tiers - (s_info[d_c[c]][0] - f_c_s[c][d_c[c]]))) * 2 * 15.0;
+                    double time_to_destination_stack_option = time_from_prev + Params.get_time(c_info[c][0],d_c[c], c_info[c][1], s_info[d_c[c]][0] - f_c_s[c][d_c[c]], tiers, stacks_per_bay);
                     if (time_to_destination_stack_option < time_to_destination_stack) {
                         highest_due_date = c_info[c][2];
                         next = c;
@@ -767,14 +745,8 @@ public class Relocation implements Comparable<Relocation> {
                 if (block_options.size() == 1 || !consider_time) {
                     candidate_block = block_options.first();
                 } else if (block_options.size() > 1 && consider_time) {
-                    double time_to_destination_stack = 1000000;
-                    for (int block : block_options) {
-                        double time_to_destination_stack_option = (double) Math.abs(c_info[prev_block][0]/stacks_per_bay - c_info[block][0]/stacks_per_bay) * 2 * 1.875 + (double) Math.abs(c_info[prev_block][0] % stacks_per_bay - c_info[block][0] % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - c_info[prev_block][1]) + (tiers - (c_info[block][0]))) * 2 * 15.0;
-                        if (time_to_destination_stack_option < time_to_destination_stack) {
-                            candidate_block = block;
-                            candidate_prio = c_info[candidate_block][2];
-                        }
-                    }
+                    candidate_block = Params.compute_nearest_stack(block_options, tiers, stacks_per_bay, c_info[prev_block][0], c_info[prev_block][1], 1);
+                    candidate_prio = c_info[candidate_block][2];
                 }
                 if (candidate_found) {
                     System.out.println("Stack filling!");
@@ -821,15 +793,9 @@ public class Relocation implements Comparable<Relocation> {
                 if (block_options.size() == 1 || !consider_time) {
                     candidate_block = block_options.first();
                 } else if (block_options.size() > 1 && consider_time) {
-                    double time_to_destination_stack = 1000000;
-                    for (int block : block_options) {
-                        double time_to_destination_stack_option = (double) Math.abs(c_info[prev_block][0]/stacks_per_bay - c_info[block][0]/stacks_per_bay) * 2 * 1.875 + (double) Math.abs(c_info[prev_block][0] % stacks_per_bay - c_info[block][0] % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - c_info[prev_block][1]) + (tiers - (c_info[block][0]))) * 2 * 15.0;
-                        if (time_to_destination_stack_option < time_to_destination_stack) {
-                            candidate_block = block;
-                            candidate_prio = c_info[candidate_block][2];
-                            candidate_stack = c_info[candidate_block][0];
-                        }
-                    }
+                    candidate_block = Params.compute_nearest_stack(block_options, tiers, stacks_per_bay, c_info[prev_block][0], c_info[prev_block][1], 1);
+                    candidate_prio = c_info[candidate_block][2];
+                    candidate_stack = c_info[candidate_block][0];
                 }
                 if (candidate_found) {
                     filling_blocks[filling_count][0] = candidate_block;
@@ -878,14 +844,8 @@ public class Relocation implements Comparable<Relocation> {
                 if (block_options.size() == 1 || !consider_time) {
                     candidate_block = block_options.first();
                 } else if (block_options.size() > 1 && consider_time) {
-                    double time_to_destination_stack = 1000000;
-                    for (int block : block_options) {
-                        double time_to_destination_stack_option = (double) Math.abs(c_info[prev_block][0]/stacks_per_bay - c_info[block][0]/stacks_per_bay) * 2 * 1.875 + (double) Math.abs(c_info[prev_block][0] % stacks_per_bay - c_info[block][0] % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - c_info[prev_block][1]) + (tiers - (c_info[block][0]))) * 2 * 15.0;
-                        if (time_to_destination_stack_option < time_to_destination_stack) {
-                            candidate_block = block;
-                            candidate_prio = c_info[candidate_block][2];
-                        }
-                    }
+                    candidate_block = Params.compute_nearest_stack(block_options, tiers, stacks_per_bay, c_info[prev_block][0], c_info[prev_block][1], 1);
+                    candidate_prio = c_info[candidate_block][2];
                 }
                 if (candidate_found) {
                     //wenn unter ausgewähltem Block ein Block
