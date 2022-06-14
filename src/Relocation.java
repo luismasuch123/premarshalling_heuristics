@@ -41,8 +41,6 @@ public class Relocation implements Comparable<Relocation> {
         this.next_tier = next_tier;
     }
 
-    //TODO: in compute_nearest_stack auslagern
-
     @Override
     public int compareTo(Relocation r) {
         return Integer.compare(relocation_count, r.relocation_count);
@@ -76,67 +74,92 @@ public class Relocation implements Comparable<Relocation> {
                 s_info_help[s][0] = s_info[s][0];
                 s_info_help[s][1] = s_info[s][1];
             }
-            int selected_stack [] = new int [same_stack_below.length];
+            int [] selected_stack = new int [same_stack_below.length];
             for (int c = 0; c < same_stack_below.length; c++) {
                 TreeSet<Integer> stack_options = new TreeSet<>();
-                if (stack_selection == "The Lowest Position") {
-                    int minimum_stack_height = tiers;
-                    for (int s = 0; s < stacks; s++) {
-                        if (s != c_info[same_stack_below[c]][0] && (s_info_help[s][0] + 1) < tiers) {
-                            if (! ((s_info_help[s][0] + 2) == tiers && stacks == 3)) {
-                                if (s_info_help[s][0] < minimum_stack_height) {
-                                    minimum_stack_height = s_info_help[s][0];
-                                    stack_options.clear();
-                                    stack_options.add(s);
-                                } else if (s_info_help[s][0] == minimum_stack_height) {
-                                    stack_options.add(s);
-                                }
-                            }
-                        }
-                    }
-                } else if (stack_selection == "Lowest Priority Index") {
-                    int highest_due_date_value = 0;
-                    for (int s = 0; s < stacks; s++) {
-                        int highest_due_date_value_option = 0;
-                        if (s != c_info[same_stack_below[c]][0] && (s_info_help[s][0] + 1) < tiers) {
-                            if (! ((s_info_help[s][0] + 2) == tiers && stacks == 3)) {
-                                if (s_info_help[s][1] == 0) {
-                                    for (int t = 0; t <= s_info[s][0]; t++) {
-                                        if (copy[s][t][2] == 0){
-                                            if (copy[s][t][1] > highest_due_date_value_option) {
-                                                highest_due_date_value_option = copy[s][t][1];
-                                            }
-                                        }
+                switch (stack_selection) {
+                    case "The Lowest Position" -> {
+                        int minimum_stack_height = tiers;
+                        for (int s = 0; s < stacks; s++) {
+                            if (s != c_info[same_stack_below[c]][0] && (s_info_help[s][0] + 1) < tiers) {
+                                if (!((s_info_help[s][0] + 2) == tiers && stacks == 3)) {
+                                    if (s_info_help[s][0] < minimum_stack_height) {
+                                        minimum_stack_height = s_info_help[s][0];
+                                        stack_options.clear();
+                                        stack_options.add(s);
+                                    } else if (s_info_help[s][0] == minimum_stack_height) {
+                                        stack_options.add(s);
                                     }
                                 }
                             }
                         }
-                        if (highest_due_date_value_option > highest_due_date_value) {
-                            highest_due_date_value = highest_due_date_value_option;
-                            stack_options.clear();
-                            stack_options.add(s);
-                        } else if (highest_due_date_value_option != 0 && highest_due_date_value_option == highest_due_date_value) {
-                            stack_options.add(s);
-                        }
                     }
-                    //wenn kein not well located block für relocation vorhanden, dann wird relocation auf Stack mit der niedrigsten, höchsten Prio innerhalb des Stacks durchgeführt
-                    if (stack_options.size() == 0) {
-                        int lowest_due_date_value = 1000000;
+                    case "Lowest Priority Index" -> {
+                        int highest_due_date_value = 0;
                         for (int s = 0; s < stacks; s++) {
                             int highest_due_date_value_option = 0;
                             if (s != c_info[same_stack_below[c]][0] && (s_info_help[s][0] + 1) < tiers) {
-                                if (! ((s_info_help[s][0] + 2) == tiers && stacks == 3)) {
-                                    if (s_info_help[s][1] == 1) {
+                                if (!((s_info_help[s][0] + 2) == tiers && stacks == 3)) {
+                                    if (s_info_help[s][1] == 0) {
                                         for (int t = 0; t <= s_info[s][0]; t++) {
-                                            if (copy[s][t][1] > highest_due_date_value_option) {
-                                                highest_due_date_value_option = copy[s][t][1];
+                                            if (copy[s][t][2] == 0) {
+                                                if (copy[s][t][1] > highest_due_date_value_option) {
+                                                    highest_due_date_value_option = copy[s][t][1];
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
-                            if (highest_due_date_value_option != 0 && highest_due_date_value_option < lowest_due_date_value) {
-                                lowest_due_date_value = highest_due_date_value_option;
+                            if (highest_due_date_value_option > highest_due_date_value) {
+                                highest_due_date_value = highest_due_date_value_option;
+                                stack_options.clear();
+                                stack_options.add(s);
+                            } else if (highest_due_date_value_option != 0 && highest_due_date_value_option == highest_due_date_value) {
+                                stack_options.add(s);
+                            }
+                        }
+                        //wenn kein not well located block für relocation vorhanden, dann wird relocation auf Stack mit der niedrigsten, höchsten Prio innerhalb des Stacks durchgeführt
+                        if (stack_options.size() == 0) {
+                            int lowest_due_date_value = 1000000;
+                            for (int s = 0; s < stacks; s++) {
+                                int highest_due_date_value_option = 0;
+                                if (s != c_info[same_stack_below[c]][0] && (s_info_help[s][0] + 1) < tiers) {
+                                    if (!((s_info_help[s][0] + 2) == tiers && stacks == 3)) {
+                                        if (s_info_help[s][1] == 1) {
+                                            for (int t = 0; t <= s_info[s][0]; t++) {
+                                                if (copy[s][t][1] > highest_due_date_value_option) {
+                                                    highest_due_date_value_option = copy[s][t][1];
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                if (highest_due_date_value_option != 0 && highest_due_date_value_option < lowest_due_date_value) {
+                                    lowest_due_date_value = highest_due_date_value_option;
+                                    stack_options.clear();
+                                    stack_options.add(s);
+                                } else if (highest_due_date_value_option != 0 && highest_due_date_value_option == highest_due_date_value) {
+                                    stack_options.add(s);
+                                }
+                            }
+                        }
+                    }
+                    case "MinMax" -> {
+                        int highest_due_date_value = 0;
+                        for (int s = 0; s < stacks; s++) {
+                            int highest_due_date_value_option = 0;
+                            if (s != c_info[same_stack_below[c]][0] && (s_info_help[s][0] + 1) < tiers) {
+                                if (!((s_info_help[s][0] + 2) == tiers && stacks == 3)) {
+                                    for (int t = 0; t <= s_info[s][0]; t++) {
+                                        if (copy[s][t][1] > highest_due_date_value_option) {
+                                            highest_due_date_value_option = copy[s][t][1];
+                                        }
+                                    }
+                                }
+                            }
+                            if (highest_due_date_value_option > highest_due_date_value) {
+                                highest_due_date_value = highest_due_date_value_option;
                                 stack_options.clear();
                                 stack_options.add(s);
                             } else if (highest_due_date_value_option != 0 && highest_due_date_value_option == highest_due_date_value) {
@@ -144,28 +167,6 @@ public class Relocation implements Comparable<Relocation> {
                             }
                         }
                     }
-                } else if (stack_selection == "MinMax") {
-                    int highest_due_date_value = 0;
-                    for (int s = 0; s < stacks; s++) {
-                        int highest_due_date_value_option = 0;
-                        if (s != c_info[same_stack_below[c]][0] && (s_info_help[s][0] + 1) < tiers) {
-                            if (! ((s_info_help[s][0] + 2) == tiers && stacks == 3)) {
-                                for (int t = 0; t <= s_info[s][0]; t++) {
-                                    if (copy[s][t][1] > highest_due_date_value_option) {
-                                        highest_due_date_value_option = copy[s][t][1];
-                                    }
-                                }
-                            }
-                        }
-                        if (highest_due_date_value_option > highest_due_date_value) {
-                            highest_due_date_value = highest_due_date_value_option;
-                            stack_options.clear();
-                            stack_options.add(s);
-                        } else if (highest_due_date_value_option != 0 && highest_due_date_value_option == highest_due_date_value) {
-                            stack_options.add(s);
-                        }
-                    }
-
                 }
                 if (stack_options.size() == 0) {
                     deadlock = true;
@@ -179,17 +180,19 @@ public class Relocation implements Comparable<Relocation> {
                     s_info_help[selected_stack[c]][0] += 1;
                 }
             }
-            System.out.println("selected_stack: " + Arrays.toString(selected_stack));
+            if (PreMarshalling.print_info) {
+                System.out.println("selected_stack: " + Arrays.toString(selected_stack));
+            }
 
             if (!deadlock) {
-                //next in nächsten Stack s umgelagern, der keinem der Stacks aus selected_stack[] entspricht (am besten der nächste Platz)
+                //next in nächsten Stack s umlagern, der keinem der Stacks aus selected_stack[] entspricht (am besten der nächste Platz)
                 double time_to_stopover_stack = 100000;
                 int stopover_stack = 0;
                 for (int s = 0; s < stacks; s++) {
                     //prüft, ob s einem der selected_stacks für same_stack_below-Blöcke entspricht
                     boolean selected_stacks_contains_s = false;
-                    for (int ss = 0; ss < selected_stack.length; ss++) {
-                        if (s == selected_stack[ss]) {
+                    for (int i : selected_stack) {
+                        if (s == i) {
                             selected_stacks_contains_s = true;
                             break;
                         }
@@ -285,10 +288,13 @@ public class Relocation implements Comparable<Relocation> {
         } else {
             prev_stack_sorted = true;
         }
-
-        System.out.println("Block " + block + " from stack " + prev_stack + " to stack " + next_stack);
+        if (PreMarshalling.print_info) {
+            System.out.println("Block " + block + " from stack " + prev_stack + " to stack " + next_stack);
+        }
         if (prev_tier != tiers-1 && copy[prev_stack][prev_tier+1][0] != 0) {
-            System.out.println("Illegal move!");
+            if (PreMarshalling.print_info) {
+                System.out.println("Illegal move!");
+            }
             System.exit(0);
         }
 
@@ -331,14 +337,13 @@ public class Relocation implements Comparable<Relocation> {
         distance_total[2] += Math.abs(next_stack /stacks_per_bay - prev_stack/ stacks_per_bay);
 
         if (multiple_bays) {
-            PreMarshallingJovanovic.relocations_on_hold.add(new Relocation(relocations_count, block, prev_stack, next_stack, prev_tier, next_tier));
+            PreMarshalling.relocations_on_hold.add(new Relocation(relocations_count, block, prev_stack, next_stack, prev_tier, next_tier));
         } else {
-            PreMarshallingJovanovic.relocations_on_hold.add(new Relocation(relocations_count, block, prev_stack + current_bay * stacks_per_bay, next_stack + current_bay * stacks_per_bay, prev_tier, next_tier));
+            PreMarshalling.relocations_on_hold.add(new Relocation(relocations_count, block, prev_stack + current_bay * stacks_per_bay, next_stack + current_bay * stacks_per_bay, prev_tier, next_tier));
         }
-
-        System.out.println("current_bay: " + Arrays.deepToString(copy));
-        System.out.println("c_info: " + Arrays.deepToString(Params.c_info));
-        System.out.println("s_info: " + Arrays.deepToString(Params.s_info));
+        if (PreMarshalling.print_info) {
+            System.out.println("current_bay: " + Arrays.deepToString(copy));
+        }
     }
 
     public static void compute__order_relocations__same_stack_below_Jovanovic(int[][] c_info, int[][] s_info, int[] d_c, int [][] g_c_s, int [][] f_c_s, int next) {
@@ -418,92 +423,96 @@ public class Relocation implements Comparable<Relocation> {
         stopover_stack_prevent_deadlock = 0;
         for (int c = 0; c < order_relocations.length; c++) {
             TreeSet<Integer> stack_options = new TreeSet<>();
-            if (stack_selection == "The Lowest Position") {
-                int minimum_stack_height = tiers;
-                for (int s = 0; s < stacks; s++) {
-                    //prüfen, ob s nicht (gleich ds und Blöcke über next liegen)
-                    if (!(same_stack_over && s == c_info[order_relocations[c]][0])) {
-                        //prüfen, ob s nicht gleich aktueller stack, s nicht gleich ds von next und ob stack schon voll
-                        if (s != c_info[next_block][0] && s != c_info[order_relocations[c]][0] && s != d_c[next_block] && (s_info_help[s][0] + 1) < tiers) {
-                            if (s_info_help[s][0] < minimum_stack_height) {
-                                minimum_stack_height = s_info_help[s][0];
-                                stack_options.clear();
-                                stack_options.add(s);
-                            } else if (s_info_help[s][0] == minimum_stack_height) {
-                                stack_options.add(s);
-                            }
-                        }
-                    }
-                }
-            } else if (stack_selection == "Lowest Priority Index") {
-                int highest_due_date_value = 0;
-                for (int s = 0; s < stacks; s++) {
-                    int highest_due_date_value_option = 0;
-                    if (!(same_stack_over && s == c_info[order_relocations[c]][0])) {
-                        if (s != c_info[next_block][0] && s != c_info[order_relocations[c]][0] && s != d_c[next_block] && (s_info_help[s][0] + 1) < tiers) {
-                            if (s_info_help[s][1] == 0) {
-                                for (int t = 0; t <= s_info[s][0]; t++) {
-                                    if (copy[s][t][2] == 0) {
-                                        if (copy[s][t][1] > highest_due_date_value_option) {
-                                            highest_due_date_value_option = copy[s][t][1];
-                                        }
-                                    }
+            switch (stack_selection) {
+                case "The Lowest Position" -> {
+                    int minimum_stack_height = tiers;
+                    for (int s = 0; s < stacks; s++) {
+                        //prüfen, ob s nicht (gleich ds und Blöcke über next liegen)
+                        if (!(same_stack_over && s == c_info[order_relocations[c]][0])) {
+                            //prüfen, ob s nicht gleich aktueller stack, s nicht gleich ds von next und ob stack schon voll
+                            if (s != c_info[next_block][0] && s != c_info[order_relocations[c]][0] && s != d_c[next_block] && (s_info_help[s][0] + 1) < tiers) {
+                                if (s_info_help[s][0] < minimum_stack_height) {
+                                    minimum_stack_height = s_info_help[s][0];
+                                    stack_options.clear();
+                                    stack_options.add(s);
+                                } else if (s_info_help[s][0] == minimum_stack_height) {
+                                    stack_options.add(s);
                                 }
                             }
                         }
                     }
-                    if (highest_due_date_value_option > highest_due_date_value) {
-                        highest_due_date_value = highest_due_date_value_option;
-                        stack_options.clear();
-                        stack_options.add(s);
-                    } else if (highest_due_date_value_option != 0 && highest_due_date_value_option == highest_due_date_value) {
-                        stack_options.add(s);
-                    }
                 }
-                //wenn kein not well located block für relocation vorhanden, dann wird relocation auf Stack mit der niedrigsten, höchsten Prio innerhalb des Stacks durchgeführt
-                if (stack_options.size() == 0) {
-                    int lowest_due_date_value = 1000000;
+                case "Lowest Priority Index" -> {
+                    int highest_due_date_value = 0;
                     for (int s = 0; s < stacks; s++) {
                         int highest_due_date_value_option = 0;
                         if (!(same_stack_over && s == c_info[order_relocations[c]][0])) {
                             if (s != c_info[next_block][0] && s != c_info[order_relocations[c]][0] && s != d_c[next_block] && (s_info_help[s][0] + 1) < tiers) {
-                                if (s_info_help[s][1] == 1) {
+                                if (s_info_help[s][1] == 0) {
                                     for (int t = 0; t <= s_info[s][0]; t++) {
-                                        if (copy[s][t][1] > highest_due_date_value_option) {
-                                            highest_due_date_value_option = copy[s][t][1];
+                                        if (copy[s][t][2] == 0) {
+                                            if (copy[s][t][1] > highest_due_date_value_option) {
+                                                highest_due_date_value_option = copy[s][t][1];
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
-                        if (highest_due_date_value_option != 0 && highest_due_date_value_option < lowest_due_date_value) {
-                            lowest_due_date_value = highest_due_date_value_option;
+                        if (highest_due_date_value_option > highest_due_date_value) {
+                            highest_due_date_value = highest_due_date_value_option;
                             stack_options.clear();
                             stack_options.add(s);
                         } else if (highest_due_date_value_option != 0 && highest_due_date_value_option == highest_due_date_value) {
                             stack_options.add(s);
                         }
                     }
-                }
-            } else if (stack_selection == "MinMax") {
-                int highest_due_date_value = 0;
-                for (int s = 0; s < stacks; s++) {
-                    int highest_due_date_value_option = 0;
-                    if (!(same_stack_over && s == c_info[order_relocations[c]][0])) {
-                        if (s != c_info[next_block][0] && s != c_info[order_relocations[c]][0] && s != d_c[next_block] && (s_info_help[s][0] + 1) < tiers) {
-                            for (int t = 0; t <= s_info[s][0]; t++) {
-                                if (copy[s][t][1] > highest_due_date_value_option) {
-                                    highest_due_date_value_option = copy[s][t][1];
+                    //wenn kein not well located block für relocation vorhanden, dann wird relocation auf Stack mit der niedrigsten, höchsten Prio innerhalb des Stacks durchgeführt
+                    if (stack_options.size() == 0) {
+                        int lowest_due_date_value = 1000000;
+                        for (int s = 0; s < stacks; s++) {
+                            int highest_due_date_value_option = 0;
+                            if (!(same_stack_over && s == c_info[order_relocations[c]][0])) {
+                                if (s != c_info[next_block][0] && s != c_info[order_relocations[c]][0] && s != d_c[next_block] && (s_info_help[s][0] + 1) < tiers) {
+                                    if (s_info_help[s][1] == 1) {
+                                        for (int t = 0; t <= s_info[s][0]; t++) {
+                                            if (copy[s][t][1] > highest_due_date_value_option) {
+                                                highest_due_date_value_option = copy[s][t][1];
+                                            }
+                                        }
+                                    }
                                 }
+                            }
+                            if (highest_due_date_value_option != 0 && highest_due_date_value_option < lowest_due_date_value) {
+                                lowest_due_date_value = highest_due_date_value_option;
+                                stack_options.clear();
+                                stack_options.add(s);
+                            } else if (highest_due_date_value_option != 0 && highest_due_date_value_option == highest_due_date_value) {
+                                stack_options.add(s);
                             }
                         }
                     }
-                    if (highest_due_date_value_option > highest_due_date_value) {
-                        highest_due_date_value = highest_due_date_value_option;
-                        stack_options.clear();
-                        stack_options.add(s);
-                    } else if (highest_due_date_value_option != 0 && highest_due_date_value_option == highest_due_date_value) {
-                        stack_options.add(s);
+                }
+                case "Min Max" -> {
+                    int highest_due_date_value = 0;
+                    for (int s = 0; s < stacks; s++) {
+                        int highest_due_date_value_option = 0;
+                        if (!(same_stack_over && s == c_info[order_relocations[c]][0])) {
+                            if (s != c_info[next_block][0] && s != c_info[order_relocations[c]][0] && s != d_c[next_block] && (s_info_help[s][0] + 1) < tiers) {
+                                for (int t = 0; t <= s_info[s][0]; t++) {
+                                    if (copy[s][t][1] > highest_due_date_value_option) {
+                                        highest_due_date_value_option = copy[s][t][1];
+                                    }
+                                }
+                            }
+                        }
+                        if (highest_due_date_value_option > highest_due_date_value) {
+                            highest_due_date_value = highest_due_date_value_option;
+                            stack_options.clear();
+                            stack_options.add(s);
+                        } else if (highest_due_date_value_option != 0 && highest_due_date_value_option == highest_due_date_value) {
+                            stack_options.add(s);
+                        }
                     }
                 }
             }
@@ -579,10 +588,11 @@ public class Relocation implements Comparable<Relocation> {
         }
         if (next_option_found) {
             Object[] next_options = next_options_set.toArray();
-            if (next_selection == "function h_c") {
-                next_block = get_next_funtion_h_c_Jovanovic(c_info, s_info, consider_time, next_block, d_c, w_c_s, f_c_s, next_options, next_option_found, tiers, stacks_per_bay, containers);
-            } else if (next_selection == "highest due date value") {
-                next_block = get_next_highest_due_date_value_Jovanovic(c_info, s_info, consider_time, next_block, d_c, f_c_s, next_options, next_option_found, tiers, stacks_per_bay);
+            switch (next_selection) {
+                case "function h_c" ->
+                    next_block = get_next_function_h_c_Jovanovic(c_info, s_info, consider_time, next_block, d_c, w_c_s, f_c_s, next_options, next_option_found, tiers, stacks_per_bay, containers);
+                case "highest due date value" ->
+                    next_block = get_next_highest_due_date_value_Jovanovic(c_info, s_info, consider_time, next_block, d_c, f_c_s, next_options, next_option_found, tiers, stacks_per_bay);
             }
         } else {
             System.out.println("DEADLOCK! No next_option found.");
@@ -590,28 +600,26 @@ public class Relocation implements Comparable<Relocation> {
         }
     }
 
-    public static int get_next_funtion_h_c_Jovanovic(int [][] c_info, int [][] s_info, boolean consider_time, int next, int[] d_c, int[][] w_c_s, int[][] f_c_s, Object[] next_options, boolean next_option_found, int tiers, int stacks_per_bay, int containers) {
-        //number of forced relocations: in this approximation, a forced relocation occurs only if a block c is being relocated and all of the top stack due date values are larger than p(c)
+    public static int get_next_function_h_c_Jovanovic(int [][] c_info, int [][] s_info, boolean consider_time, int next, int[] d_c, int[][] w_c_s, int[][] f_c_s, Object[] next_options, boolean next_option_found, int tiers, int stacks_per_bay, int containers) {
+        //number of forced relocations: in this approximation, a forced relocation occurs only if a block c is being relocated and all the top stack due date values are larger than p(c)
         //if all blocks in a stack are well located we shall consider the stack having due date value zero
         int[] fr_c_s = new int[containers];
-        //werden im Paper nur forced relocations aus stack s oder auch aus destination stack ss betrachtet? -> hier werden beide betrachtet
+        //werden im Paper nur forced relocations aus stack s oder auch aus destination stack ss betrachtet? → hier werden beide betrachtet
         fr_c_s = Params.compute_fr_c_s(copy, fr_c_s, d_c, next_options);
-        //System.out.println("fr_c_s: " + Arrays.toString(fr_c_s));
 
         int[] h_c = new int[containers];
-        for (int cc = 0; cc < next_options.length; cc++) {
-            int c = (int) next_options[cc];
+        for (Object nextOption : next_options) {
+            int c = (int) nextOption;
             h_c[c] = w_c_s[c][d_c[c]] + fr_c_s[c] - c_info[c][2];
         }
-        //System.out.println("h_c: " + Arrays.toString(h_c));
 
         //indice of next block to be relocated is calculated
         int min_value = 1000000;
         double time_to_destination_stack = 1000000;
         //double time_from_prev = 1000000;
         if (next_option_found) {
-            for (int cc = 0; cc < next_options.length; cc++) {
-                int c = (int) next_options[cc];
+            for (Object nextOption : next_options) {
+                int c = (int) nextOption;
                 double time_from_prev = Params.get_time(c_info[next][0], c_info[prev_block][0], s_info[c_info[next][0]][0], c_info[prev_block][1], tiers, stacks_per_bay);
                 if (h_c[c] < min_value) {
                     next = c;
@@ -619,15 +627,14 @@ public class Relocation implements Comparable<Relocation> {
                     if (s_info[d_c[next]][0] != -1) {
                         time_to_destination_stack = time_from_prev + Params.get_time(c_info[next][0], d_c[next], c_info[next][1], s_info[d_c[next]][0] - f_c_s[next][d_c[next]] + 1, tiers, stacks_per_bay);
                     } else {
-                        time_to_destination_stack = time_from_prev + Params.get_time(c_info[next][0], d_c[next], c_info[next][1],0, tiers, stacks_per_bay);
+                        time_to_destination_stack = time_from_prev + Params.get_time(c_info[next][0], d_c[next], c_info[next][1], 0, tiers, stacks_per_bay);
                     }
                 } else if (consider_time && h_c[c] == min_value) {
-                    int next_option = c;
                     double time_to_destination_stack_option;
-                    if (s_info[d_c[next_option]][0] != -1) {
-                        time_to_destination_stack_option = time_from_prev + Params.get_time(c_info[next_option][0], d_c[next_option], c_info[next_option][1], s_info[d_c[next_option]][0] - f_c_s[next_option][d_c[next_option]] + 1, tiers, stacks_per_bay);
+                    if (s_info[d_c[c]][0] != -1) {
+                        time_to_destination_stack_option = time_from_prev + Params.get_time(c_info[c][0], d_c[c], c_info[c][1], s_info[d_c[c]][0] - f_c_s[c][d_c[c]] + 1, tiers, stacks_per_bay);
                     } else {
-                        time_to_destination_stack_option = time_from_prev + Params.get_time(c_info[next_option][0], d_c[next_option], c_info[next_option][1], 0, tiers, stacks_per_bay);
+                        time_to_destination_stack_option = time_from_prev + Params.get_time(c_info[c][0], d_c[c], c_info[c][1], 0, tiers, stacks_per_bay);
                     }
                     if (time_to_destination_stack_option < time_to_destination_stack) {
                         time_to_destination_stack = time_to_destination_stack_option;
@@ -685,15 +692,15 @@ public class Relocation implements Comparable<Relocation> {
         int highest_due_date = 0;
         double time_to_destination_stack = 1000000;
         if (next_option_found) {
-            for (int cc = 0; cc < next_options.length; cc++) {
-                int c = (int) next_options[cc];
-                double time_from_prev = (double) Math.abs(c_info[next][0]/stacks_per_bay - c_info[prev_block][0]/stacks_per_bay) * 2 * 1.875 + (double) Math.abs(c_info[next][0] % stacks_per_bay - c_info[prev_block][0] % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - s_info[c_info[next][0]][0]) + (tiers - c_info[prev_block][1])) * 2 * 15.0;
+            for (Object next_option : next_options) {
+                int c = (int) next_option;
+                double time_from_prev = (double) Math.abs(c_info[next][0] / stacks_per_bay - c_info[prev_block][0] / stacks_per_bay) * 2 * 1.875 + (double) Math.abs(c_info[next][0] % stacks_per_bay - c_info[prev_block][0] % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - s_info[c_info[next][0]][0]) + (tiers - c_info[prev_block][1])) * 2 * 15.0;
                 if (c_info[c][2] > highest_due_date) {
                     time_to_destination_stack = time_from_prev + Params.get_time(c_info[c][0], d_c[c], c_info[c][1], s_info[d_c[c]][0] - f_c_s[c][d_c[c]], tiers, stacks_per_bay);
                     highest_due_date = c_info[c][2];
                     next = c;
                 } else if (consider_time && c_info[c][2] == highest_due_date) {
-                    double time_to_destination_stack_option = time_from_prev + Params.get_time(c_info[c][0],d_c[c], c_info[c][1], s_info[d_c[c]][0] - f_c_s[c][d_c[c]], tiers, stacks_per_bay);
+                    double time_to_destination_stack_option = time_from_prev + Params.get_time(c_info[c][0], d_c[c], c_info[c][1], s_info[d_c[c]][0] - f_c_s[c][d_c[c]], tiers, stacks_per_bay);
                     if (time_to_destination_stack_option < time_to_destination_stack) {
                         highest_due_date = c_info[c][2];
                         next = c;
@@ -714,150 +721,158 @@ public class Relocation implements Comparable<Relocation> {
         int candidate_block;
         int candidate_stack;
         int candidate_prio;
-        boolean candidate_found = false;
-        if (stack_filling == "Standard") {
-            while (current_height < tiers - 1) {
-                candidate_found = false;
-                candidate_block = 0;
-                candidate_prio = 0;
-                TreeSet<Integer> block_options = new TreeSet<>();
-                for (int s = 0; s < stacks; s++) {
-                    if (s != next_stack && s_info[s][0] != -1) {
-                        if (s_info[s][1] == 0 && copy[s][s_info[s][0]][1] < next_prio) {
-                            int candidate_prio_option = copy[s][s_info[s][0]][1];
-                            if (candidate_prio_option > candidate_prio) {
-                                candidate_block = copy[s][s_info[s][0]][0] - 1;
-                                block_options.clear();
-                                block_options.add(candidate_block);
-                                candidate_found = true;
-                                candidate_prio = candidate_prio_option;
-                            }
-                        } else if (s_info[s][1] == 0 && copy[s][s_info[s][0]][1] == next_prio) {
-                            int candidate_prio_option = copy[s][s_info[s][0]][1];
-                            if (candidate_prio_option > candidate_prio) {
-                                candidate_block = copy[s][s_info[s][0]][0] - 1;
-                                block_options.add(candidate_block);
-                                candidate_prio = candidate_prio_option;
-                            }
-                        }
-                    }
-                }
-                if (block_options.size() == 1 || !consider_time) {
-                    candidate_block = block_options.first();
-                } else if (block_options.size() > 1 && consider_time) {
-                    candidate_block = Params.compute_nearest_stack(block_options, tiers, stacks_per_bay, c_info[prev_block][0], c_info[prev_block][1], 1);
-                    candidate_prio = c_info[candidate_block][2];
-                }
-                if (candidate_found) {
-                    System.out.println("Stack filling!");
-                    relocate(c_info, s_info, candidate_block, candidate_prio, next_stack, tiers, stacks_per_bay, multiple_bays);
-                    current_height++;
-                } else {
-                    current_height = tiers;
-                }
-            }
-        } else if (stack_filling == "Safe") {
-            int [][] filling_blocks = new int [tiers-1][2]; //block, prio
-            int filling_count = 0;
-            int [][] s_info_help = new int [stacks][2];
-            for (int s = 0; s < stacks; s++) {
-                s_info_help[s][0] = s_info[s][0];
-                s_info_help[s][1] = s_info[s][1];
-            }
-            while (current_height < tiers - 1) {
-                candidate_found = false;
-                candidate_block = 0;
-                candidate_stack = 0;
-                candidate_prio = 0;
-                TreeSet<Integer> block_options = new TreeSet<>();
-                for (int s = 0; s < stacks; s++) {
-                    if (s != next_stack && s_info_help[s][0] != -1) {
-                        if (s_info_help[s][1] == 0 && copy[s][s_info_help[s][0]][1] < next_prio) {
-                            int candidate_prio_option = copy[s][s_info_help[s][0]][1];
-                            if (candidate_prio_option > candidate_prio) {
-                                candidate_block = copy[s][s_info_help[s][0]][0] - 1;
-                                block_options.clear();
-                                block_options.add(candidate_block);
-                                candidate_stack = s;
-                                candidate_found = true;
-                                candidate_prio = candidate_prio_option;
-                            } else if (candidate_prio_option > candidate_prio) {
-                                candidate_block = copy[s][s_info_help[s][0]][0] - 1;
-                                block_options.add(candidate_block);
-                                candidate_stack = s;
-                                candidate_prio = candidate_prio_option;
+        boolean candidate_found;
+        switch (stack_filling) {
+            case "Standard" -> {
+                while (current_height < tiers - 1) {
+                    candidate_found = false;
+                    candidate_block = 0;
+                    candidate_prio = 0;
+                    TreeSet<Integer> block_options = new TreeSet<>();
+                    for (int s = 0; s < stacks; s++) {
+                        if (s != next_stack && s_info[s][0] != -1) {
+                            if (s_info[s][1] == 0 && copy[s][s_info[s][0]][1] < next_prio) {
+                                int candidate_prio_option = copy[s][s_info[s][0]][1];
+                                if (candidate_prio_option > candidate_prio) {
+                                    candidate_block = copy[s][s_info[s][0]][0] - 1;
+                                    block_options.clear();
+                                    block_options.add(candidate_block);
+                                    candidate_found = true;
+                                    candidate_prio = candidate_prio_option;
+                                }
+                            } else if (s_info[s][1] == 0 && copy[s][s_info[s][0]][1] == next_prio) {
+                                int candidate_prio_option = copy[s][s_info[s][0]][1];
+                                if (candidate_prio_option > candidate_prio) {
+                                    candidate_block = copy[s][s_info[s][0]][0] - 1;
+                                    block_options.add(candidate_block);
+                                    candidate_prio = candidate_prio_option;
+                                }
                             }
                         }
                     }
-                }
-                if (block_options.size() == 1 || !consider_time) {
-                    candidate_block = block_options.first();
-                } else if (block_options.size() > 1 && consider_time) {
-                    candidate_block = Params.compute_nearest_stack(block_options, tiers, stacks_per_bay, c_info[prev_block][0], c_info[prev_block][1], 1);
-                    candidate_prio = c_info[candidate_block][2];
-                    candidate_stack = c_info[candidate_block][0];
-                }
-                if (candidate_found) {
-                    filling_blocks[filling_count][0] = candidate_block;
-                    filling_blocks[filling_count][1] = candidate_prio;
-                    s_info_help[candidate_stack][0] -= 1;
-                    s_info_help[candidate_stack][1] = copy[candidate_stack][c_info[candidate_block][1]-1][2];
-                    current_height++;
-                    filling_count++;
-                } else {
-                    current_height = tiers;
-                }
-            }
-            int alpha = 1;
-            if ((tiers - (height + 1 + filling_count)) <= alpha) {
-                for (int c = 0; c < filling_blocks.length; c++) {
-                    if (filling_blocks[c][1] != 0) {
-                        System.out.println("Stack filling!");
-                        relocate(c_info, s_info, filling_blocks[c][0], filling_blocks[c][1], next_stack, tiers, stacks_per_bay, multiple_bays);
+                    if (block_options.size() == 1 || !consider_time) {
+                        candidate_block = block_options.first();
+                    } else if (block_options.size() > 1 && consider_time) {
+                        candidate_block = Params.compute_nearest_stack(block_options, tiers, stacks_per_bay, c_info[prev_block][0], c_info[prev_block][1], 1);
+                        candidate_prio = c_info[candidate_block][2];
                     }
-                }
-            }
-        } else if (stack_filling == "Stop") {
-            while (current_height < tiers - 1) {
-                candidate_found = false;
-                candidate_block = 0;
-                candidate_prio = 0;
-                TreeSet<Integer> block_options = new TreeSet<>();
-                for (int s = 0; s < stacks; s++) {
-                    if (s != next_stack && s_info[s][0] != -1) {
-                        if (s_info[s][1] == 0 && copy[s][s_info[s][0]][1] < next_prio) {
-                            int candidate_prio_option = copy[s][s_info[s][0]][1];
-                            if (candidate_prio_option > candidate_prio) {
-                                candidate_block = copy[s][s_info[s][0]][0] - 1;
-                                block_options.clear();
-                                block_options.add(candidate_block);
-                                candidate_found = true;
-                                candidate_prio = candidate_prio_option;
-                            } else if (candidate_prio_option > candidate_prio) {
-                                candidate_block = copy[s][s_info[s][0]][0] - 1;
-                                block_options.add(candidate_block);
-                                candidate_prio = candidate_prio_option;
-                            }
+                    if (candidate_found) {
+                        if (PreMarshalling.print_info) {
+                            System.out.println("Stack filling!");
                         }
-                    }
-                }
-                if (block_options.size() == 1 || !consider_time) {
-                    candidate_block = block_options.first();
-                } else if (block_options.size() > 1 && consider_time) {
-                    candidate_block = Params.compute_nearest_stack(block_options, tiers, stacks_per_bay, c_info[prev_block][0], c_info[prev_block][1], 1);
-                    candidate_prio = c_info[candidate_block][2];
-                }
-                if (candidate_found) {
-                    //wenn unter ausgewähltem Block ein Block
-                    if (s_info[c_info[candidate_block][0]][0] > 0 && candidate_prio < copy[c_info[candidate_block][0]][c_info[candidate_block][1]-1][2]) {
-                        current_height = tiers;
-                    } else {
-                        System.out.println("Stack filling!");
                         relocate(c_info, s_info, candidate_block, candidate_prio, next_stack, tiers, stacks_per_bay, multiple_bays);
                         current_height++;
+                    } else {
+                        current_height = tiers;
                     }
-                } else {
-                    current_height = tiers;
+                }
+            }
+            case "Safe" -> {
+                int[][] filling_blocks = new int[tiers - 1][2]; //block, prio
+                int filling_count = 0;
+                int[][] s_info_help = new int[stacks][2];
+                for (int s = 0; s < stacks; s++) {
+                    s_info_help[s][0] = s_info[s][0];
+                    s_info_help[s][1] = s_info[s][1];
+                }
+                while (current_height < tiers - 1) {
+                    candidate_found = false;
+                    candidate_block = 0;
+                    candidate_stack = 0;
+                    candidate_prio = 0;
+                    TreeSet<Integer> block_options = new TreeSet<>();
+                    for (int s = 0; s < stacks; s++) {
+                        if (s != next_stack && s_info_help[s][0] != -1) {
+                            if (s_info_help[s][1] == 0 && copy[s][s_info_help[s][0]][1] < next_prio) {
+                                int candidate_prio_option = copy[s][s_info_help[s][0]][1];
+                                if (candidate_prio_option > candidate_prio) {
+                                    candidate_block = copy[s][s_info_help[s][0]][0] - 1;
+                                    block_options.clear();
+                                    block_options.add(candidate_block);
+                                    candidate_stack = s;
+                                    candidate_found = true;
+                                    candidate_prio = candidate_prio_option;
+                                } else if (candidate_prio_option == candidate_prio) {
+                                    candidate_block = copy[s][s_info_help[s][0]][0] - 1;
+                                    block_options.add(candidate_block);
+                                    candidate_stack = s;
+                                }
+                            }
+                        }
+                    }
+                    if (block_options.size() == 1 || !consider_time) {
+                        candidate_block = block_options.first();
+                    } else if (block_options.size() > 1 && consider_time) {
+                        candidate_block = Params.compute_nearest_stack(block_options, tiers, stacks_per_bay, c_info[prev_block][0], c_info[prev_block][1], 1);
+                        candidate_prio = c_info[candidate_block][2];
+                        candidate_stack = c_info[candidate_block][0];
+                    }
+                    if (candidate_found) {
+                        filling_blocks[filling_count][0] = candidate_block;
+                        filling_blocks[filling_count][1] = candidate_prio;
+                        s_info_help[candidate_stack][0] -= 1;
+                        s_info_help[candidate_stack][1] = copy[candidate_stack][c_info[candidate_block][1] - 1][2];
+                        current_height++;
+                        filling_count++;
+                    } else {
+                        current_height = tiers;
+                    }
+                }
+                int alpha = 1;
+                if ((tiers - (height + 1 + filling_count)) <= alpha) {
+                    for (int[] filling_block : filling_blocks) {
+                        if (filling_block[1] != 0) {
+                            if (PreMarshalling.print_info) {
+                                System.out.println("Stack filling!");
+                            }
+                            relocate(c_info, s_info, filling_block[0], filling_block[1], next_stack, tiers, stacks_per_bay, multiple_bays);
+                        }
+                    }
+                }
+            }
+            case "Stop" -> {
+                while (current_height < tiers - 1) {
+                    candidate_found = false;
+                    candidate_block = 0;
+                    candidate_prio = 0;
+                    TreeSet<Integer> block_options = new TreeSet<>();
+                    for (int s = 0; s < stacks; s++) {
+                        if (s != next_stack && s_info[s][0] != -1) {
+                            if (s_info[s][1] == 0 && copy[s][s_info[s][0]][1] < next_prio) {
+                                int candidate_prio_option = copy[s][s_info[s][0]][1];
+                                if (candidate_prio_option > candidate_prio) {
+                                    candidate_block = copy[s][s_info[s][0]][0] - 1;
+                                    block_options.clear();
+                                    block_options.add(candidate_block);
+                                    candidate_found = true;
+                                    candidate_prio = candidate_prio_option;
+                                } else if (candidate_prio_option == candidate_prio) {
+                                    candidate_block = copy[s][s_info[s][0]][0] - 1;
+                                    block_options.add(candidate_block);
+                                }
+                            }
+                        }
+                    }
+                    if (block_options.size() == 1 || !consider_time) {
+                        candidate_block = block_options.first();
+                    } else if (block_options.size() > 1 && consider_time) {
+                        candidate_block = Params.compute_nearest_stack(block_options, tiers, stacks_per_bay, c_info[prev_block][0], c_info[prev_block][1], 1);
+                        candidate_prio = c_info[candidate_block][2];
+                    }
+                    if (candidate_found) {
+                        //wenn unter ausgewähltem Block ein Block
+                        if (s_info[c_info[candidate_block][0]][0] > 0 && candidate_prio < copy[c_info[candidate_block][0]][c_info[candidate_block][1] - 1][2]) {
+                            current_height = tiers;
+                        } else {
+                            if (PreMarshalling.print_info) {
+                                System.out.println("Stack filling!");
+                            }
+                            relocate(c_info, s_info, candidate_block, candidate_prio, next_stack, tiers, stacks_per_bay, multiple_bays);
+                            current_height++;
+                        }
+                    } else {
+                        current_height = tiers;
+                    }
                 }
             }
         }

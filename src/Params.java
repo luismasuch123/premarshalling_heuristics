@@ -28,6 +28,24 @@ public class Params {
     static int next_stack_R_deconstruct;
     static int next_stack_W_deconstruct;
 
+    //LB
+    static int n_m;
+    static int n_bx;
+    static int n_gx;
+
+    static int groups; //number of different prio-groups
+    static int n_b; //number of badly placed items in L
+    static int [] n_b_s; //number of badly placed items in stack s
+    static int n_b_s_min;
+    static int [][] n_g_s; //number of well placed items of all groups gs < g in stack s
+    static int [] d_g; //number of ll badly placed items of group g / demand of group g
+    static int [] d_g_cum; //cumulative demand of group g
+    static int [] s_p_g; //number of all potential supply slots of group g / potential supply of group g
+    static int [] s_p_g_cum; //cumulative potential supply of group g
+    static int [] d_s_g_cum; //cumulative demand surplus of group g
+    static int [] d_s_g_cum_max; //value, index
+
+
 
     public static void check_sorted_pre(int [][][] initial_bay, int stacks, int tiers) {
         sorted = true;
@@ -35,12 +53,14 @@ public class Params {
             for (int t = 0; t < tiers; t++) {
                 if (initial_bay[s][t][2] == 0) {
                     sorted = false;
-                    break;
+                    t = tiers;
                 }
             }
         }
         if (sorted) {
-            System.out.println("Bay ist bereits geordnet!");
+            if (PreMarshalling.print_info) {
+                System.out.println("Bay ist bereits geordnet!");
+            }
         }
     }
 
@@ -55,6 +75,7 @@ public class Params {
     }
 
     public static void compute__w_c_s(int stacks, int containers) {
+        w_c_s = new int[containers][stacks];
         for (int c = 0; c < containers; c++) {
             for (int s = 0; s < stacks; s++) {
                 if (c_info[c][0] != s) {
@@ -67,6 +88,7 @@ public class Params {
     }
 
     public static void compute__f_c_s_ext(int stacks, int containers) {
+        f_c_s_ext = new int[containers][stacks];
         for (int c = 0; c < containers; c++) {
             for (int s = 0; s < stacks; s++) {
                 f_c_s_ext[c][s] = f_c_s[c][s] + nw_c_s[c][s];
@@ -135,6 +157,7 @@ public class Params {
     }
 
     public static void compute_d_c(int [][][] copy, int stacks, int stacks_per_bay, int tiers, int containers, boolean consider_time) {
+        d_c = new int [containers];
         for(int c = 0; c < containers; c++) {
             //Liste mit den Indizes der niedrigsten w_c_s erstellen, um dann Distanzen zu vergleichen
             int lowest_w_c_s = 100000;
@@ -170,10 +193,13 @@ public class Params {
     }
 
     public static double get_time(int stack_from, int stack_to, int tier_from, int tier_to, int tiers, int stacks_per_bay) {
+        //TODO: Beschleunigung berücksichtigen?
         return (double) Math.abs(stack_from/stacks_per_bay - stack_to/stacks_per_bay) * 2 * 1.875 + (double) Math.abs(stack_from % stacks_per_bay - stack_to % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - tier_from) + (tiers - tier_to)) * 2 * 15.0;
     }
 
-    public static void compute__f_c_s__nw_c_s(int [][][] copy, int stacks, int tiers) {
+    public static void compute__f_c_s__nw_c_s(int [][][] copy, int stacks, int tiers, int containers) {
+        f_c_s = new int[containers][stacks];
+        nw_c_s = new int[containers][stacks];
         for(int c = 0; c < c_info.length; c++) {
             int prio_c = c_info[c][2];
             for(int s = 0; s < stacks; s++) {
@@ -199,7 +225,7 @@ public class Params {
         }
     }
 
-    public static void compute_bay_info(int [][][] copy, int stacks) {
+    public static void compute__bay_info(int [][][] copy, int stacks) {
         int empty_stacks_count = 0;
         for (int s = 0; s < stacks; s++) {
             if (s_info[s][1] == 1) {
@@ -238,7 +264,8 @@ public class Params {
         }
     }
 
-    public static void compute__c_info__s_info__g_c_s(int [][][] copy, int stacks, int tiers) {
+    public static void compute__c_info__s_info__g_c_s(int [][][] copy, int stacks, int tiers, int containers) {
+        g_c_s = new int[containers][stacks];
         for(int s = 0; s < stacks; s++) {
             int containers_above_c = 0;
             boolean highest_tier_found = false;
@@ -366,7 +393,9 @@ public class Params {
                         next_stack_W = compute_nearest_stack(stack_options_W, tiers, stacks_per_bay, next_stack_R, s_info[next_stack_R][0], 0);
                     }
                     if (next_stack_R_found && next_stack_W_found) {
-                        System.out.println("Complete high R stack!");
+                        if (PreMarshalling.print_info) {
+                            System.out.println("Complete high R stack!");
+                        }
                         int candidate_block = copy[next_stack_W][s_info[next_stack_W][0]][0] - 1;
                         int next_stack_W_prio = copy[next_stack_W][s_info[next_stack_W][0]][1];
                         Relocation.relocate(c_info, s_info, candidate_block, next_stack_W_prio, next_stack_R, tiers, stacks_per_bay, multiple_bays);
@@ -459,7 +488,9 @@ public class Params {
                         next_stack_W = compute_nearest_stack(stack_options_W, tiers, stacks_per_bay, next_stack_R, s_info[next_stack_R][0], 0);
                     }
                     if (next_stack_R_found && next_stack_W_found) {
-                        System.out.println("Complete low R stack!");
+                        if (PreMarshalling.print_info) {
+                            System.out.println("Complete low R stack!");
+                        }
                         int candidate_block = copy[next_stack_W][s_info[next_stack_W][0]][0] - 1;
                         int next_stack_W_prio = copy[next_stack_W][s_info[next_stack_W][0]][1];
                         Relocation.relocate(c_info, s_info, candidate_block, next_stack_W_prio, next_stack_R, tiers, stacks_per_bay, multiple_bays);
@@ -468,27 +499,26 @@ public class Params {
             }
             if (!next_stack_R_found || !next_stack_W_found) {
                 if (!next_stack_R_found) {
-                    System.out.println("No next_stack_R could be found!");
+                    if (PreMarshalling.print_info) {
+                        System.out.println("No next_stack_R could be found!");
+                    }
                 } else if (s_info[next_stack_R][0] < beta_h) {
-                    System.out.println("Next_stack_R " + next_stack_R +" doesn't reach or exceed beta_h " + beta_h + ". Possible relocations canceled!");
+                    if (PreMarshalling.print_info) {
+                        System.out.println("Next_stack_R " + next_stack_R + " doesn't reach or exceed beta_h " + beta_h + ". Possible relocations canceled!");
+                    }
                     next_stack_R_checked[next_stack_R] = 1;
                     copy = BayInstance.copy_bay(current_bay, Relocation.copy, stacks, tiers);
                     Params.compute__c_info__s_info(copy, stacks, tiers);
-                    //c_info = Params.c_info;
-                    //s_info = Params.s_info;
                     //Wenn die relocations rückgängig gemacht werden, müssen sie auch aus relocations_on_hold gelöscht werden
-                    PreMarshallingJovanovic.relocations_on_hold.clear();
+                    PreMarshalling.relocations_on_hold.clear();
                 } else {
-                    System.out.println("Next_stack_R " + next_stack_R +" does reach or exceed beta_h " + beta_h + ".");
+                    if (PreMarshalling.print_info) {
+                        System.out.println("Next_stack_R " + next_stack_R + " does reach or exceed beta_h " + beta_h + ".");
+                    }
                     next_stack_R_checked[next_stack_R] = 1;
-                    PreMarshallingJovanovic.current_bay = BayInstance.copy_bay(Relocation.copy, current_bay, stacks, tiers);
+                    PreMarshalling.current_bay = BayInstance.copy_bay(Relocation.copy, current_bay, stacks, tiers);
                     current_bay = BayInstance.copy_bay(Relocation.copy, current_bay, stacks, tiers);
-                    PreMarshallingJovanovic.relocations.addAll(PreMarshallingJovanovic.relocations_on_hold);
-
-                    //Params.compute__c_info__s_info(copy, stacks, tiers);
-                    //TODO: Zuweisungen s_info und c_info notwendig?
-                    //c_info = Params.c_info;
-                    //s_info = Params.s_info;
+                    PreMarshalling.relocations.addAll(PreMarshalling.relocations_on_hold);
                 }
             }
         }
@@ -547,14 +577,16 @@ public class Params {
                         next_stack_R_deconstruct = compute_nearest_stack(stack_options_R, tiers, stacks_per_bay, next_stack_R_low, s_info[next_stack_R_low][0], 0);
                     }
                     if (next_stack_R_low_found && next_stack_R_found) {
-                        System.out.println("Deconstruct low R stack! Move from R_low to R.");
+                        if (PreMarshalling.print_info) {
+                            System.out.println("Deconstruct low R stack! Move from R_low to R.");
+                        }
                         int candidate_block = copy[next_stack_R_low][s_info[next_stack_R_low][0]][0] - 1;
                         Relocation.relocate(c_info, s_info, candidate_block, next_stack_R_low_prio, next_stack_R_deconstruct, tiers, stacks_per_bay, multiple_bays);
                         current_bay = BayInstance.copy_bay(Relocation.copy, current_bay, stacks, tiers);
-                        PreMarshallingJovanovic.relocations.addAll(PreMarshallingJovanovic.relocations_on_hold);
+                        PreMarshalling.relocations.addAll(PreMarshalling.relocations_on_hold);
 
                         Params.complete_low_R_stacks(copy, current_bay, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
-                        PreMarshallingJovanovic.relocations.addAll(PreMarshallingJovanovic.relocations_on_hold);
+                        PreMarshalling.relocations.addAll(PreMarshalling.relocations_on_hold);
 
                         if (s_info[next_stack_R_low][0] == -1 || s_info[next_stack_R_low][0] >= beta_h) {
                             if (s_info[next_stack_R_low][0] == -1) {
@@ -608,14 +640,16 @@ public class Params {
                                 next_stack_W_deconstruct = compute_nearest_stack(stack_options_W, tiers, stacks_per_bay, next_stack_R_low, s_info[next_stack_R_low][0], 0);
                             }
                             if (next_stack_R_low_found && next_stack_W_found) {
-                                System.out.println("Deconstruct low R stack! Move from R_low to W.");
+                                if (PreMarshalling.print_info) {
+                                    System.out.println("Deconstruct low R stack! Move from R_low to W.");
+                                }
                                 int candidate_block = copy[next_stack_R_low][s_info[next_stack_R_low][0]][0] - 1;
                                 Relocation.relocate(c_info, s_info, candidate_block, next_stack_R_low_prio, next_stack_W_deconstruct, tiers, stacks_per_bay, multiple_bays);
                                 current_bay = BayInstance.copy_bay(Relocation.copy, current_bay, stacks, tiers);
-                                PreMarshallingJovanovic.relocations.addAll(PreMarshallingJovanovic.relocations_on_hold);
+                                PreMarshalling.relocations.addAll(PreMarshalling.relocations_on_hold);
 
                                 Params.complete_low_R_stacks(copy, current_bay, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
-                                PreMarshallingJovanovic.relocations.addAll(PreMarshallingJovanovic.relocations_on_hold);
+                                PreMarshalling.relocations.addAll(PreMarshalling.relocations_on_hold);
 
                                 if (s_info[next_stack_R_low][0] == -1 || s_info[next_stack_R_low][0] >= beta_h) {
                                     if (s_info[next_stack_R_low][0] == -1) {
@@ -703,12 +737,16 @@ public class Params {
                     }
                 }
                 if (block_in_W_found && !consider_time) {
-                    System.out.println("Move containers in W to empty stack!");
+                    if (PreMarshalling.print_info) {
+                        System.out.println("Move containers in W to empty stack!");
+                    }
                     W_block = W_options.first();
                     int W_block_prio = c_info[W_block][2];
                     Relocation.relocate(c_info, s_info, W_block, W_block_prio, empty_stack, tiers, stacks_per_bay, multiple_bays);
                 } else if (block_in_W_found && consider_time) {
-                    System.out.println("Move containers in W to empty stack!");
+                    if (PreMarshalling.print_info) {
+                        System.out.println("Move containers in W to empty stack!");
+                    }
                     W_block = compute_nearest_stack(W_options, tiers, stacks_per_bay, empty_stack, s_info[empty_stack][0], 1);
                     int W_block_prio = c_info[W_block][2];
                     Relocation.relocate(c_info, s_info, W_block, W_block_prio, empty_stack, tiers, stacks_per_bay, multiple_bays);
@@ -745,19 +783,20 @@ public class Params {
             }
             boolean stack_destination_found = true;
             while (stack_source_found && stack_destination_found && s_info[W_stack_source][0] != -1) {
-                //denjenigen W stack mit der niedrigsten Prio des obersten Blockes suchen, da so möglichst keine Blöcke, die bald umgelagert werden sollen umgelagert werden
-                //reicht wenn Prio nicht kleiner ist als Block aus empty Stack -> bei consider_time nächsten Stack mit Block mit kleiner/gleichen Prio
+                //denjenigen W stack mit der niedrigsten Prio des obersten Blockes suchen, da so möglichst keine Blöcke, die bald umgelagert werden sollen, blockiert werden
+                //reicht, wenn Prio nicht kleiner ist als Block aus empty Stack → bei consider_time nächsten Stack mit Block mit kleiner/gleichen Prio
                 stack_destination_found = false;
                 int W_stack_destination = 0;
                 int destination_prio = 100000;
                 TreeSet<Integer> stack_options_W = new TreeSet<>();
                 for (int s = 0; s < stacks; s++) {
-                    if (s_info[s][0] != tiers-1 && s != W_stack_source && s_info[s][1] == 0 && s_info[s][0] < destination_prio) { //TODO: Prio-Kriterium schlechter als gar keins?
+                    if (s_info[s][0] != tiers-1 && s != W_stack_source && s_info[s][1] == 0 && (copy[s][s_info[s][0]][1] < destination_prio && !(copy[W_stack_source][s_info[W_stack_source][0]][1] >= copy[s][s_info[s][0]][1]))) {
                         stack_destination_found = true;
                         stack_options_W.clear();
                         stack_options_W.add(s);
                         destination_prio = copy[s][s_info[s][0]][1];
-                    } else if (s_info[s][0] != tiers - 1 && s != W_stack_source && s_info[s][1] == 0 && s_info[s][0] == destination_prio) {
+                    } else if (s_info[s][0] != tiers - 1 && s != W_stack_source && s_info[s][1] == 0 && (copy[s][s_info[s][0]][1] == destination_prio || copy[W_stack_source][s_info[W_stack_source][0]][1] >= copy[s][s_info[s][0]][1])) {
+                        stack_destination_found = true;
                         stack_options_W.add(s);
                     }
                 }
@@ -771,10 +810,14 @@ public class Params {
                 if (stack_destination_found) {
                     int block = copy[W_stack_source][s_info[W_stack_source][0]][0] - 1;
                     int prio = c_info[block][2];
-                    System.out.println("Create empty stack: Move containers in W to W!");
+                    if (PreMarshalling.print_info) {
+                        System.out.println("Create empty stack: Move containers in W to W!");
+                    }
                     Relocation.relocate(c_info, s_info, block, prio, W_stack_destination, tiers, stacks_per_bay, multiple_bays);
                     if (s_info[W_stack_source][0] == -1) {
-                        System.out.println("Create empty stack: Stack emptied!");
+                        if (PreMarshalling.print_info) {
+                            System.out.println("Create empty stack: Stack emptied!");
+                        }
                         stack_source_found = false;
                     } else {
                         all_W_stacks_exhausted = true;
@@ -786,12 +829,15 @@ public class Params {
                         }
                     }
                 } else {
-                    stacks_checked[W_stack_source] = 1;
-                    PreMarshallingJovanovic.current_bay = BayInstance.copy_bay(Relocation.copy, PreMarshallingJovanovic.current_bay, stacks, tiers);
+                    if (s_info[W_stack_source][1] == 1 && all_W_stacks_exhausted) {
+                        stack_source_found = false;
+                    }
+                    stacks_checked[W_stack_source] = 1; //TODO: überflüssig?
+                    PreMarshalling.current_bay = BayInstance.copy_bay(Relocation.copy, PreMarshalling.current_bay, stacks, tiers);
                 }
             }
         }
-        if (PreMarshallingJovanovic.relocation_count_current == Relocation.relocations_count || all_W_stacks_exhausted) {
+        if (PreMarshalling.relocation_count_current == Relocation.relocations_count || all_W_stacks_exhausted) {
             stack_source_found = true;
             stacks_checked = new int[stacks];
             while (stack_source_found) {
@@ -810,7 +856,6 @@ public class Params {
                             stack_options_empty.add(s);
                         }
                     }
-                    //consider_time to prev_block
                     if (stack_options_empty.size() != 0 && (stack_options_empty.size() == 1 || !consider_time)) {
                         W_stack_source = stack_options_empty.first();
                     } else if (stack_options_empty.size() != 0 && consider_time) { //Zeit von prev_block zu next_stack_R berücksichtigen
@@ -819,19 +864,13 @@ public class Params {
                 }
                 boolean stack_destination_found = true;
                 while (stack_source_found && stack_destination_found && s_info[W_stack_source][0] != -1) {
-                    //denjenigen W stack mit der niedrigsten Prio des obersten Blockes suchen, da so möglichst keine Blöcke, die bald umgelagert werden sollen umgelagert werden
-                    //reicht wenn Prio nicht kleiner ist als Block aus empty Stack -> bei consider_time nächsten Stack mit Block mit kleiner/gleichen Prio
+                    //denjenigen R stack mit der geringsten zeitlichen Entfernung zu stack source auswählen, da der Block sowieso wieder umgelagert werden muss
                     stack_destination_found = false;
                     int W_stack_destination = 0;
-                    int destination_prio = 100000;
                     TreeSet<Integer> stack_options_W = new TreeSet<>();
                     for (int s = 0; s < stacks; s++) {
-                        if (s_info[s][0] != tiers-1 && s != W_stack_source && s_info[s][1] == 1) { //TODO: Prio-Kriterium schlechter als gar keins?
+                        if (s_info[s][0] != tiers - 1 && s != W_stack_source && s_info[s][1] == 1) {
                             stack_destination_found = true;
-                            stack_options_W.clear();
-                            stack_options_W.add(s);
-                            destination_prio = copy[s][s_info[s][0]][1];
-                        } else if (s_info[s][0] != tiers - 1 && s != W_stack_source && s_info[s][1] == 1) {
                             stack_options_W.add(s);
                         }
                     }
@@ -845,16 +884,166 @@ public class Params {
                     if (stack_destination_found) {
                         int block = copy[W_stack_source][s_info[W_stack_source][0]][0] - 1;
                         int prio = c_info[block][2];
-                        System.out.println("Create empty stack: Move containers in W to R!");
+                        if (PreMarshalling.print_info) {
+                            System.out.println("Create empty stack: Move containers in W to R!");
+                        }
                         Relocation.relocate(c_info, s_info, block, prio, W_stack_destination, tiers, stacks_per_bay, multiple_bays);
                         if (s_info[W_stack_source][0] == -1) {
-                            System.out.println("Create empty stack: Stack emptied!");
+                            if (PreMarshalling.print_info) {
+                                System.out.println("Create empty stack: Stack emptied!");
+                            }
                             stack_source_found = false;
                         }
                     } else {
                         stacks_checked[W_stack_source] = 1;
-                        PreMarshallingJovanovic.current_bay = BayInstance.copy_bay(Relocation.copy, PreMarshallingJovanovic.current_bay, stacks, tiers);
+                        PreMarshalling.current_bay = BayInstance.copy_bay(Relocation.copy, PreMarshalling.current_bay, stacks, tiers);
                     }
+                }
+            }
+        }
+    }
+
+    public static void compute_params_Jovanovic(int[][][] copy, int stacks, int stacks_per_bay, int tiers, int containers, boolean consider_time) {
+        compute__c_info__s_info__g_c_s(copy, stacks, tiers, containers);
+        compute__bay_info(copy, stacks);
+        compute__f_c_s__nw_c_s(copy, stacks, tiers, containers);
+        compute__f_c_s_ext(stacks, containers);
+        compute__w_c_s(stacks, containers);
+        compute_d_c(copy, stacks, stacks_per_bay, tiers, containers, consider_time);
+    }
+
+    public static int compute_params_LB(int [][][] initial_bay, int stacks, int stacks_per_bay, int tiers, int containers) {
+        compute__groups(initial_bay, stacks, tiers);
+        compute__n_b__n_b_s(initial_bay, stacks, tiers);
+        compute__n_g_s(initial_bay, stacks, tiers);
+        compute__d_g__d_g_cum(initial_bay, stacks, tiers);
+        compute__s_p_g__s_p_g_cum(initial_bay, stacks, tiers);
+        compute__d_s_g_cum(initial_bay, stacks, tiers);
+
+        return compute__n_m(stacks, tiers);
+    }
+
+    private static int compute__n_m(int stacks, int tiers) {
+        n_bx = n_b + n_b_s_min;
+
+        int n_s_gx = Math.max(0, d_s_g_cum_max[0] / tiers);
+        //stacks werden nach n_g_s aufsteigend sortiert , um dann die n_g_s in den ersten n_s_gx stacks aufzusummieren
+        n_gx = 0; //Summe n_g_s über die ersten n_s_gx stacks nach Sortierung
+        int [] stacks_checked = new int [stacks];
+        for (int i = 0; i < n_s_gx; i++) {
+            int n_g_s_min_val = 100000;
+            int n_g_s_min_index = 0;
+            for (int s = 0; s < stacks; s++) {
+                if (n_g_s[d_s_g_cum_max[1]][s] <= n_g_s_min_val && stacks_checked[s] == 0) {
+                    n_g_s_min_val = n_g_s[d_s_g_cum_max[1]][s];
+                    n_g_s_min_index = s;
+                }
+            }
+            n_gx += n_g_s_min_val;
+            stacks_checked[n_g_s_min_index] = 1;
+        }
+
+        return n_bx + n_gx;
+    }
+
+    private static void compute__d_s_g_cum(int[][][] initial_bay, int stacks, int tiers) {
+        d_s_g_cum = new int [groups];
+        d_s_g_cum_max = new int [2];
+        for (int g = 0; g < groups; g++) {
+            d_g_cum[g] = d_g_cum[g] - s_p_g_cum[g];
+            if (d_s_g_cum[g] > d_s_g_cum_max[0]) {
+                d_s_g_cum_max[0] = d_s_g_cum[g];
+                d_s_g_cum_max[1] = g;
+            }
+        }
+    }
+
+    private static void compute__s_p_g__s_p_g_cum(int[][][] initial_bay, int stacks, int tiers) {
+        s_p_g = new int [groups];
+        s_p_g_cum = new int [groups];
+        int empty_stacks = 0;
+        for (int g = 0; g < groups; g++) {
+            for (int s = 0; s < stacks; s++) {
+                if (s_info[s][0] != -1) {
+                    for (int t = 0; t <= s_info[s][0]; t++) {
+                        if (initial_bay[s][t][2] == 0 && initial_bay[s][t-1][1] == g+1) {
+                            s_p_g[g] += tiers - t;
+                            t = tiers;
+                        }
+                    }
+                } else {
+                    empty_stacks++;
+                }
+            }
+        }
+        for (int g = 0; g < groups; g++) {
+            for (int gg = g; gg < groups; gg++) {
+                s_p_g_cum[g] += s_p_g[gg];
+            }
+            s_p_g_cum[g] += tiers * empty_stacks;
+        }
+
+    }
+
+    private static void compute__d_g__d_g_cum(int[][][] initial_bay, int stacks, int tiers) {
+        d_g = new int [groups];
+        d_g_cum = new int [groups];
+        for (int g = 0; g < groups; g++) {
+            for (int s = 0; s < stacks; s++) {
+                if (s_info[s][1] == 0) {
+                    for (int t = 0; t <= s_info[s][0]; t++) {
+                        if (initial_bay[s][t][1] == g + 1 && initial_bay[s][t][2] == 0) {
+                            d_g[g] += 1;
+                        }
+                    }
+                }
+            }
+        }
+        for (int g = 0; g < groups; g++) {
+            for (int gg = g; gg < groups; gg++) {
+                d_g_cum[g] += d_g[gg];
+            }
+        }
+    }
+
+    private static void compute__groups(int[][][] initial_bay, int stacks, int tiers) {
+        groups = 0;
+        for (int s = 0; s < stacks; s++) {
+            for (int t = 0; t <= s_info[s][0]; t++) {
+                if (initial_bay[s][t][1] > groups) {
+                    groups = initial_bay[s][t][1] - 1;
+                }
+            }
+        }
+    }
+
+    private static void compute__n_g_s(int [][][] initial_bay, int stacks, int tiers) {
+
+        n_g_s = new int [groups][stacks];
+        for (int g = 0; g < groups; g++) {
+            for (int s = 0; s < stacks; s++) {
+                for (int t = 0; t <= s_info[s][0]; t++) {
+                    if (initial_bay[s][t][1] < g+1) {
+                        n_g_s[g][s] += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    private static void compute__n_b__n_b_s(int [][][] initial_bay, int stacks, int tiers) {
+        n_b_s = new int[stacks];
+        n_b_s_min = 100000;
+        for (int s = 0; s < stacks; s++) {
+            if (s_info[s][1] == 0) {
+                for (int t = 0; t <= s_info[s][0]; t++) {
+                    if (initial_bay[s][t][2] == 0) {
+                        n_b += 1;
+                        n_b_s[s] += 1;
+                    }
+                }
+                if (n_b_s[s] < n_b_s_min) {
+                    n_b_s_min = n_b_s[s];
                 }
             }
         }
