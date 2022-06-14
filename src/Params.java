@@ -914,13 +914,96 @@ public class Params {
 
     public static int compute_params_LB(int [][][] initial_bay, int stacks, int stacks_per_bay, int tiers, int containers) {
         compute__groups(initial_bay, stacks, tiers);
-        compute__n_b__n_b_s(initial_bay, stacks, tiers);
+        compute__n_b__n_b_s(initial_bay, stacks, tiers, false);
         compute__n_g_s(initial_bay, stacks, tiers);
         compute__d_g__d_g_cum(initial_bay, stacks, tiers);
         compute__s_p_g__s_p_g_cum(initial_bay, stacks, tiers);
         compute__d_s_g_cum(initial_bay, stacks, tiers);
 
+        int LB_F = compute__n_m(stacks, tiers);
+
+        //wenn alle geordneten stacks voll sind, kann wie im Fall, dass alle stacks ungeordnet sind, n_b_s_min addiert werden
+        compute__n_b__n_b_s(initial_bay, stacks, tiers, true);
+        int IBF_0 = compute__n_m(stacks, tiers);
+
+        int IBF_1 = compute__IBF_1__IBF_2__IBF_3(LB_F, IBF_0, stacks, tiers)[0];
+
+        int IBF_2 = compute__IBF_1__IBF_2__IBF_3(LB_F, IBF_0, stacks, tiers)[1];
+
+        int IBF_3 = compute__IBF_1__IBF_2__IBF_3(LB_F, IBF_0, stacks, tiers)[2];
+
+        int IBF_4 = 0;
+
+        switch (PreMarshalling.lower_bound_method) {
+            case "LB_F" -> {
+                return LB_F;
+            }
+            case "IBF_0" -> {
+                return IBF_0;
+            }
+            case "IBF_1" -> {
+                return IBF_1;
+            }
+            case "IBF_2" -> {
+                return IBF_2;
+            }
+            case "IBF_3" -> {
+                return IBF_3;
+            }
+            case "IBF_4" -> {
+                return IBF_4;
+            }
+        }
+
         return compute__n_m(stacks, tiers);
+    }
+
+    private static int [] compute__IBF_1__IBF_2__IBF_3(int LB_F, int IBF_0, int stacks, int tiers) {
+        //IBF_1
+        boolean case_1 = true;
+        boolean case_2a = false;
+        boolean case_2b = false;
+        boolean case_3 = false;
+        boolean case_4 = false;
+        int stacks_ordered = 0;
+        int ordered_stacks_not_full = 0;
+
+        //IBF_2
+        //TODO: Parameter IBF_2 berechnen
+
+        for (int s = 0; s < stacks; s++) {
+            if (s_info[s][1] == 1) {
+                case_1 = false;
+                stacks_ordered++;
+                if (s_info[s][0] != tiers - 1) {
+                    ordered_stacks_not_full++;
+                }
+            } else if (s_info[s][1] == 1 && s_info[s][0] != tiers - 1) {
+                case_2a = true;
+            } else if (s_info[s][0] == tiers - 1) {
+                case_2b = true;
+            }
+        }
+        if (stacks_ordered == 2 && ordered_stacks_not_full >= 1) {
+            case_3 = true;
+        }
+        if (n_gx == 0 && ordered_stacks_not_full == 1) {
+            case_4 = true;
+        }
+        int IBF_2 = IBF_0;
+        if (case_1 || case_2a || case_2b || case_3 || case_4) {
+            IBF_2 = IBF_0 + 1;
+            if (case_1) {
+                //Bedingung IBF_0 = IBF_0 + 1 in dieser if-Bedingung automatisch erfüllt
+                //TODO: hier mit cases fortfahren
+            }
+
+            return new int[]{IBF_0 + 1, IBF_2, LB_F};
+        } else if (LB_F == IBF_2) { //IBF_3-Bedingung
+            return new int[]{IBF_0, IBF_0, LB_F + 1};
+        } else {
+            return new int[]{IBF_0, IBF_0, LB_F};
+        }
     }
 
     private static int compute__n_m(int stacks, int tiers) {
@@ -950,7 +1033,7 @@ public class Params {
         d_s_g_cum = new int [groups];
         d_s_g_cum_max = new int [2];
         for (int g = 0; g < groups; g++) {
-            d_g_cum[g] = d_g_cum[g] - s_p_g_cum[g];
+            d_s_g_cum[g] = d_g_cum[g] - s_p_g_cum[g];
             if (d_s_g_cum[g] > d_s_g_cum_max[0]) {
                 d_s_g_cum_max[0] = d_s_g_cum[g];
                 d_s_g_cum_max[1] = g;
@@ -968,6 +1051,8 @@ public class Params {
                     for (int t = 0; t <= s_info[s][0]; t++) {
                         if (initial_bay[s][t][2] == 0 && initial_bay[s][t-1][1] == g+1) {
                             s_p_g[g] += tiers - t;
+                            t = tiers;
+                        } else if (initial_bay[s][t][2] == 0) {
                             t = tiers;
                         }
                     }
@@ -1011,7 +1096,7 @@ public class Params {
         for (int s = 0; s < stacks; s++) {
             for (int t = 0; t <= s_info[s][0]; t++) {
                 if (initial_bay[s][t][1] > groups) {
-                    groups = initial_bay[s][t][1] - 1;
+                    groups = initial_bay[s][t][1];
                 }
             }
         }
@@ -1023,7 +1108,7 @@ public class Params {
         for (int g = 0; g < groups; g++) {
             for (int s = 0; s < stacks; s++) {
                 for (int t = 0; t <= s_info[s][0]; t++) {
-                    if (initial_bay[s][t][1] < g+1) {
+                    if (initial_bay[s][t][1] < g+1 && initial_bay[s][t][2] == 1) {
                         n_g_s[g][s] += 1;
                     }
                 }
@@ -1031,7 +1116,8 @@ public class Params {
         }
     }
 
-    private static void compute__n_b__n_b_s(int [][][] initial_bay, int stacks, int tiers) {
+    private static void compute__n_b__n_b_s(int [][][] initial_bay, int stacks, int tiers, boolean IBF_0_extension) {
+        n_b = 0;
         n_b_s = new int[stacks];
         n_b_s_min = 100000;
         for (int s = 0; s < stacks; s++) {
@@ -1045,6 +1131,10 @@ public class Params {
                 if (n_b_s[s] < n_b_s_min) {
                     n_b_s_min = n_b_s[s];
                 }
+            } else if (IBF_0_extension && s_info[s][0] != tiers-1) {
+                n_b_s_min = 0;
+            } else if (!IBF_0_extension){
+                n_b_s_min = 0;
             }
         }
     }

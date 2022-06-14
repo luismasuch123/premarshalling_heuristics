@@ -3,7 +3,7 @@ import java.util.*;
 
 public class PreMarshalling {
 
-    static String method = "Huang"; //"Jovanovic", "Huang", "LB"
+    static String [] method = {"Jovanovic", "Huang", "LB"};
     static boolean consider_time;
     static boolean multiple_bays;
     static boolean print_info;
@@ -12,155 +12,126 @@ public class PreMarshalling {
 
     static int [][][] current_bay;
 
-    static TreeSet<Relocation> relocations = new TreeSet<>(); //relocation_count, block, prev_stack, next_stack, prev_tier, next_tier
+    static TreeSet<Relocation> relocations; //relocation_count, block, prev_stack, next_stack, prev_tier, next_tier
     static TreeSet<Relocation> relocations_on_hold;
 
-    static int step = 0;
+    static int step;
     static int relocation_count_current;
-    static double time_relocations = 0; //keine Leerfahrten berücksichtigt, ohne Lastaufnahme und -abgabe
-    static double time_total = 0; //ohne Lastaufnahme und -abgabe
+    static double time_relocations; //keine Leerfahrten berücksichtigt, ohne Lastaufnahme und -abgabe
+    static double time_total; //ohne Lastaufnahme und -abgabe
 
     //Jovanovic
-    static String next_selection;
-    static String stack_selection;
-    static String stack_filling;
+    static String next_selection = "function h_c"; //"highest due date value"
+    static String stack_selection = "The Lowest Position";//"The Lowest Position", "Lowest Priority Index", "MinMax"
+    static String stack_filling = "None"; //"None", "Standard", "Safe", "Stop"
 
     //Huang
     static boolean correction;
 
     //LB
     static int lower_bound_moves;
+    static String lower_bound_method = "IBF_1"; //"LB_F", "IBF_0", "IBF_1", "IBF_2", "IBF_3", "IBF_4"
+    //TODO: Aus allen LB's die größte auswählen
 
     public static void main (String [] args) throws FileNotFoundException {
-        String initial_bay_path = "/Users/luismasuchibanez/IdeaProjects/premarshalling_heuristics/data/Test/bay1.bay";
+        String initial_bay_path = "/Users/luismasuchibanez/IdeaProjects/premarshalling_heuristics/data/Test/emm_s4_t4_p0.5_c0_6.bay";
         consider_time = true;
         multiple_bays = true;
-        print_info = true;
+        print_info = false;
         print_statistics = true;
         print_relocations = false;
-
-        //Jovanovic
-        next_selection = "function h_c"; //"highest due date value"
-        stack_selection = "The Lowest Position";//"The Lowest Position", "Lowest Priority Index", "MinMax"
-        stack_filling = "None"; //"None", "Standard", "Safe", "Stop"
 
         //Huang
         correction = false;
         Params.beta = 0.2; //scheint am besten zu sein wenn beta_h <= 1
 
-        try {
-            BayInstance instance = BayInstance.get_initial_bay(initial_bay_path, multiple_bays);
-            if (multiple_bays) {
-                int [][][] initial_bay = instance.initial_bay;
-                int stacks = instance.stacks;
-                int stacks_per_bay = instance.stacks_per_bay;
-                int tiers = instance.tiers;
-                int containers = instance.containers;
+            try {
+                BayInstance instance = BayInstance.get_initial_bay(initial_bay_path, multiple_bays);
+                for (String m: method) {
+                    reset_statistics();
+                    System.out.println("\n" + m.toUpperCase() + "\n");
+                    if (multiple_bays) {
+                        int[][][] initial_bay = instance.initial_bay;
+                        int stacks = instance.stacks;
+                        int stacks_per_bay = instance.stacks_per_bay;
+                        int tiers = instance.tiers;
+                        int containers = instance.containers;
 
-                //check if blocks are well located or not (1:well located, 0: not well located)
-                Params.compute_if_well_located(instance.initial_bay, stacks, tiers);
-                if (print_info) {
-                    System.out.println("Initial bay: " + Arrays.deepToString(instance.initial_bay));
-                }
-                Params.check_sorted_pre(initial_bay, stacks, tiers);
+                        run_methods(instance, m, initial_bay, stacks, stacks_per_bay, tiers, containers);
 
-                if (method.equals("Jovanovic") || method.equals("Huang")) {
-                    int[][][] final_bay = new int[stacks][tiers][3];
-                    if (method.equals("Jovanovic")) {
-                        final_bay = premarshall_Jovanovic(initial_bay, stacks, stacks_per_bay, tiers, containers, Relocation.order_relocations, Relocation.same_stack_under, Relocation.same_stack_below);
-                    } else if (method.equals("Huang")) {
-                        final_bay = premarshall_Huang(initial_bay, stacks, stacks_per_bay, tiers, containers);
-                    }
+                    } else {
+                        int stacks = instance.stacks_per_bay;
+                        int stacks_per_bay = instance.stacks_per_bay;
+                        int tiers = instance.tiers;
+                        for (int b = 0; b < instance.bays; b++) {
+                            Relocation.current_bay = b;
+                            step = 0;
+                            int containers = instance.containers_per_bay[b];
+                            int[][][] initial_bay = instance.initial_bays[b];
 
-                    time_relocations = (((double) Relocation.distance_relocations[0] * 2 * 15) + ((double) Relocation.distance_relocations[1] * 2 * 2.4) + ((double) Relocation.distance_relocations[2] * 2 * 1.875)) / 3600;
-                    time_total = (((double) Relocation.distance_total[0] * 2 * 15) + ((double) Relocation.distance_total[1] * 2 * 2.4) + ((double) Relocation.distance_total[2] * 2 * 1.875) + Relocation.relocations_count * 2 * 20.0) / 3600;
-
-                    if (print_info) {
-                        System.out.println("Final bay: " + Arrays.deepToString(final_bay));
-                    }
-                    if (print_statistics) {
-                        System.out.println("Relocations: " + Relocation.relocations_count);
-                        System.out.println("Distance_relocations in blocks: " + Arrays.toString(Relocation.distance_relocations));
-                        System.out.println("Distance_total in blocks: " + Arrays.toString(Relocation.distance_total));
-                        System.out.println("Time_relocations in h: " + time_relocations);
-                        System.out.println("Time_total in h: " + time_total);
-                        if (Relocation.deadlock_count > 0) {
-                            System.out.println("Deadlocks: " + Relocation.deadlock_count);
-                        }
-                        System.out.println("True number relocations: " + relocations.size());
-                    }
-                    if (print_relocations) {
-                        for (Relocation relocation : relocations) {
-                            System.out.println(relocation.toString());
-                        }
-                    }
-                } else if (method.equals("LB")) {
-                    lower_bound_moves = compute_LB(initial_bay, stacks, stacks_per_bay, tiers, containers);
-                    System.out.println("LB: " + lower_bound_moves);
-                }
-            } else {
-                int stacks = instance.stacks_per_bay;
-                int stacks_per_bay = instance.stacks_per_bay;
-                int tiers = instance.tiers;
-                for (int b = 0; b < instance.bays; b++) {
-                    Relocation.current_bay = b;
-                    step = 0;
-                    int containers = instance.containers_per_bay[b];
-                    int [][][] initial_bay = instance.initial_bays[b];
-
-                    //check if blocks are well located or not (1:well located, 0: not well located)
-                    Params.compute_if_well_located(initial_bay, stacks, tiers);
-                    if (print_info) {
-                        System.out.println("Initial bay: " + Arrays.deepToString(initial_bay));
-                    }
-                    Params.check_sorted_pre(initial_bay, stacks, tiers);
-
-                    if (method.equals("Jovanovic") || method.equals("Huang")) {
-                        int[][][] final_bay = new int[stacks][tiers][3];
-                        if (method.equals("Jovanovic")) {
-                            final_bay = premarshall_Jovanovic(initial_bay, stacks, stacks_per_bay, tiers, containers, Relocation.order_relocations, Relocation.same_stack_under, Relocation.same_stack_below);
-                        } else if (method.equals("Huang")) {
-                            final_bay = premarshall_Huang(initial_bay, stacks, stacks_per_bay, tiers, containers);
-                        }
-                        if (print_info) {
-                            System.out.println("Final bay: " + Arrays.deepToString(final_bay));
-                        }
-                        if (print_statistics) {
-                            System.out.println("Relocations: " + Relocation.relocations_count);
-                            System.out.println("Distance_relocations in blocks: " + Arrays.toString(Relocation.distance_relocations));
-                            System.out.println("Time_relocations in h: " + time_relocations);
-                            System.out.println("Distance_total in blocks: " + Arrays.toString(Relocation.distance_total));
-                            System.out.println("Time_total in h: " + time_total);
-                            if (Relocation.deadlock_count > 0) {
-                                System.out.println("Deadlocks: " + Relocation.deadlock_count);
-                            }
-                        }
-                    } else if (method.equals("LB")) {
-                        lower_bound_moves += compute_LB(initial_bay, stacks, stacks_per_bay, tiers, containers);
-                        if (b == instance.bays-1) {
-                            System.out.println("LB: " + lower_bound_moves);
+                            run_methods(instance, m, initial_bay, stacks, stacks_per_bay, tiers, containers);
                         }
                     }
                 }
-                if (print_statistics) {
-                    time_relocations += (((double) Relocation.distance_relocations[0] * 2 * 15) + ((double) Relocation.distance_relocations[1] * 2 * 2.4)) / 3600;
-                    time_total += (((double) Relocation.distance_total[0] * 2 * 15) + ((double) Relocation.distance_total[1] * 2 * 2.4) + Relocation.relocations_count * 2 * 20.0) / 3600;
-                    System.out.println("Time_relocations in h: " + time_relocations);
-                    System.out.println("Time_total in h: " + time_total);
+            } catch (FileNotFoundException e) {
+                System.out.println(("File not found!"));
+            }
+        
+    }
+
+    private static void run_methods(BayInstance instance, String method, int [][][] initial_bay, int stacks, int stacks_per_bay, int tiers, int containers) {
+        //check if blocks are well located or not (1:well located, 0: not well located)
+        Params.compute_if_well_located(initial_bay, stacks, tiers);
+        if (print_info) {
+            System.out.println("Initial bay: " + Arrays.deepToString(instance.initial_bay));
+        }
+        Params.check_sorted_pre(initial_bay, stacks, tiers);
+
+        if (method.equals("Jovanovic") || method.equals("Huang")) {
+            int[][][] final_bay = new int[stacks][tiers][3];
+            if (method.equals("Jovanovic")) {
+                final_bay = premarshall_Jovanovic(initial_bay, stacks, stacks_per_bay, tiers, containers, Relocation.order_relocations, Relocation.same_stack_under, Relocation.same_stack_below);
+            } else if (method.equals("Huang")) {
+                final_bay = premarshall_Huang(initial_bay, stacks, stacks_per_bay, tiers, containers);
+            }
+
+            time_relocations = (((double) Relocation.distance_relocations[0] * 2 * 15) + ((double) Relocation.distance_relocations[1] * 2 * 2.4) + ((double) Relocation.distance_relocations[2] * 2 * 1.875)) / 3600;
+            time_total = (((double) Relocation.distance_total[0] * 2 * 15) + ((double) Relocation.distance_total[1] * 2 * 2.4) + ((double) Relocation.distance_total[2] * 2 * 1.875) + Relocation.relocations_count * 2 * 20.0) / 3600;
+
+            if (print_info) {
+                System.out.println("Final bay: " + Arrays.deepToString(final_bay));
+            }
+            if (print_statistics) {
+                System.out.println("Relocations: " + Relocation.relocations_count);
+                System.out.println("Distance_relocations in blocks: " + Arrays.toString(Relocation.distance_relocations));
+                System.out.println("Distance_total in blocks: " + Arrays.toString(Relocation.distance_total));
+                System.out.println("Time_relocations in h: " + time_relocations);
+                System.out.println("Time_total in h: " + time_total);
+                if (Relocation.deadlock_count > 0) {
+                    System.out.println("Deadlocks: " + Relocation.deadlock_count);
                 }
-                if (print_relocations) {
-                    for (Relocation relocation : relocations) {
-                        System.out.println(relocation.toString());
-                    }
-                }
-                if (print_statistics) {
-                    System.out.println("Number relocations: " + relocations.size());
+                System.out.println("True number relocations: " + relocations.size());
+            }
+            if (print_relocations) {
+                for (Relocation relocation : relocations) {
+                    System.out.println(relocation.toString());
                 }
             }
-        } catch (FileNotFoundException e) {
-            System.out.println(("File not found!"));
+        } else if (method.equals("LB")) {
+            lower_bound_moves = compute_LB(initial_bay, stacks, stacks_per_bay, tiers, containers);
+            System.out.println("LB moves: " + lower_bound_moves);
         }
-        
+    }
+
+    private static void reset_statistics() {
+        step = 0;
+        relocations = new TreeSet<>();
+        relocation_count_current = 0;
+        time_relocations = 0;
+        time_total = 0;
+        Relocation.relocations_count = 0;
+        Relocation.distance_relocations = new int [3];
+        Relocation.distance_total = new int [3];
     }
 
     private static int compute_LB(int [][][] initial_bay, int stacks, int stacks_per_bay, int tiers, int containers) {

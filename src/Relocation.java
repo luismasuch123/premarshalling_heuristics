@@ -28,9 +28,9 @@ public class Relocation implements Comparable<Relocation> {
     static int next_block;
     static int prev_block; //letzter Block der umgelagert wurde
 
-    static int relocations_count = 0;
-    static int [] distance_relocations = new int[3]; //tiers, stacks, bays in blocks
-    static int [] distance_total = new int[3];
+    static int relocations_count;
+    static int [] distance_relocations; //tiers, stacks, bays in blocks
+    static int [] distance_total;
 
     Relocation(int relocation_count, int block, int prev_stack, int next_stack, int prev_tier, int next_tier) {
         this.relocation_count = relocation_count;
