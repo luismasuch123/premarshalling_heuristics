@@ -34,7 +34,7 @@ public class PreMarshalling {
     //TODO: Aus allen LB's die größte auswählen
 
     public static void main (String [] args) throws FileNotFoundException {
-        String initial_bay_path = "/Users/luismasuchibanez/IdeaProjects/premarshalling_heuristics/data/Test/emm_s4_t4_p0.5_c0_6.bay";
+        String initial_bay_path = "/Users/luismasuchibanez/IdeaProjects/premarshalling_heuristics/data/Test/bay2.bay";
         consider_time = true;
         multiple_bays = true;
         print_info = false;
