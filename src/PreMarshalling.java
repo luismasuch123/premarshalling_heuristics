@@ -37,7 +37,7 @@ public class PreMarshalling {
         String initial_bay_path = "/Users/luismasuchibanez/IdeaProjects/premarshalling_heuristics/data/Test/bay2.bay";
         consider_time = true;
         multiple_bays = true;
-        print_info = false;
+        print_info = true;
         print_statistics = true;
         print_relocations = false;
 

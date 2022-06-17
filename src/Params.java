@@ -36,7 +36,7 @@ public class Params {
     static Set<Integer> U = new HashSet<>(); //Set of stacks where the misoverlaying containers are "upside-down" sorted
     static Set<Integer> Us = new HashSet<>(); //Set of stacks that would be upside down if one misoverlaying containers was removed. We assume U C Us.
     //LB_F
-    static int groups; //number of different prio-groups
+    static int groups; //number of different prio-groups //Gruppe fängt bei 0 an und keine Gruppen dürfen ausgelassen werden.
     static int n_b; //number of badly placed items in L
     static int [] n_b_s; //number of badly placed items in stack s
     static int n_b_s_min;
@@ -67,7 +67,7 @@ public class Params {
     static int [] w_sec_s; //Second smallest group value of non-misoverlaying containers in stack s. If all the non-misoverlaying containers in stack s have the same group, w_sec_s = groups
     static int [] g_X_s; //Minimum top group value of the non-misoverlaid stack necessary for repairing stack s in Us with BG moves to the stack and one BX move to another stack.
     static int [] n_BG_s; //Minimum number of non-misoverlaid stacks necessary for repairing stack s with only BG moves.
-    static int [] g_BG_si; //Minimum group value of the topmost conatainer of the ith non-misoverlaid stack for repairing stack s.
+    static int [][] g_BG_si; //Minimum group value of the topmost conatainer of the ith non-misoverlaid stack for repairing stack s.
 
     public static void check_sorted_pre(int [][][] initial_bay, int stacks, int tiers) {
         sorted = true;
@@ -935,6 +935,7 @@ public class Params {
     }
 
     public static int compute_params_LB(int [][][] initial_bay, int stacks, int stacks_per_bay, int tiers, int containers) {
+        //TODO: Hat Anzahl groups Auswirkung auf Parameter bzw. hat irgendein ein array die Länge groups?
         int LB_F = compute__LB_F(initial_bay, stacks, tiers);
 
         int IBF_0 = compute__IBF_0(initial_bay, stacks, tiers, true);
@@ -985,10 +986,10 @@ public class Params {
         m_s = new int[stacks];
         m_i_s = new int[stacks][tiers-1];
         w_s = new int[stacks];
-        w_sec_s = new int[stacks];
+        w_sec_s = new int[stacks]; //gleich 0, wenn weniger als 2 geordnete Blöcke (n_N_s < 2)
         g_X_s = new int[stacks];
-        n_BG_s = new int[stacks]; //Minimum number of non-misoverlaid stacks necessary for repairing stack s with only BG moves.
-        g_BG_si = new int[stacks];
+        n_BG_s = new int[stacks];
+        g_BG_si = new int[stacks][tiers];
 
         for (int s = 0; s < stacks; s++) {
             Set<Integer> largest_misoverlaying_group_values = new TreeSet<>(); //sorts the misoverlaying group values in a stack s, so that they can be added to m_i_s afterwards
@@ -1020,19 +1021,15 @@ public class Params {
                     } else {
                         n_M_s[s]++;
                         n_M++;
-                        if (initial_bay[s][t][1] > m_s[s]) {
-                            m_s[s] = initial_bay[s][t][1];
-                            largest_misoverlaying_group_values.add(initial_bay[s][t][1]);
-                        }
+                        largest_misoverlaying_group_values.add(initial_bay[s][t][1]);
                         group_t_current = initial_bay[s][t][1];
-                        if (group_t_last > group_t_current) {
+                        if (group_t_last > group_t_current && t != tiers-1) {
                             if (n_M_s[s] > 2 && !(t == s_info[s][0] && misoverlaid_upside_down) && !(initial_bay[s][t + 1][1] >= group_t_last && misoverlaid_upside_down)) {
                                 misoverlaid_upside_down_except_one = false;
                             } else {
                             group_t_last = group_t_current;
                             }
                             misoverlaid_upside_down = false;
-                            n_BG_s[s] += 1; //TODO: überprüfen, ob es so Sinn macht
                             minimum_group_values_for_repairing.add(group_t_current);
                         } else {
                             group_t_last = group_t_current;
@@ -1051,6 +1048,10 @@ public class Params {
                 g_sec_s[s] = groups;
             } else {
                 g_sec_s[s] = initial_bay[s][s_info[s][0]-1][1];
+            }
+            //w_sec_s
+            if (n_N_s[s] < 2) {
+                w_sec_s[s] = 0;
             }
             if (s_info[s][1] == 0) {
                 S_M.add(s);
@@ -1085,11 +1086,62 @@ public class Params {
                     }
                 }
                 TreeSet<Integer> largest_misoverlaying_group_values_Reverse = (TreeSet<Integer>) ((TreeSet<Integer>) largest_misoverlaying_group_values).descendingSet();
+                m_s[s] = largest_misoverlaying_group_values_Reverse.first();
                 for (Integer j: largest_misoverlaying_group_values_Reverse) {
                     m_i_s[s][indexOf(largest_misoverlaying_group_values_Reverse, j)] = j;
                 }
+                int [][] non_misoverlaid_stacks_necessary = new int [stacks][tiers-1];
+                boolean new_stack_because_not_upside_down = false;
+                for (int t = s_info[s][0]; t > 0 && initial_bay[s][t][2] == 0; t--) {
+                    for (int ss = 0; ss < stacks; ss++) {
+                        for (int tt = 0; tt < tiers-1; tt++) {
+                            while(tt != tiers-2 && non_misoverlaid_stacks_necessary[ss][tt+1] != 0) {
+                                tt++;
+                            }
+                            if (tt == 0 && non_misoverlaid_stacks_necessary[ss][tt] == 0) {
+                                non_misoverlaid_stacks_necessary[ss][tt] = initial_bay[s][t][1];
+                                tt = tiers;
+                                ss = stacks;
+                                new_stack_because_not_upside_down = false;
+                            } else if (initial_bay[s][t][1] <= non_misoverlaid_stacks_necessary[ss][tt] && !new_stack_because_not_upside_down) {
+                                //TODO: überprüfen, dass unterhalb von Block keiner ist, der die Bedingung ebenfalls erfüllt und größer als höherer Gruppe als der Block angehört
+                                for(int ttt = t-1; ttt > 0 && initial_bay[s][ttt][2] == 0; ttt--) {
+                                    if (initial_bay[s][ttt][1] <= non_misoverlaid_stacks_necessary[ss][tt] && initial_bay[s][ttt][1] > initial_bay[s][t][1]) {
+                                        new_stack_because_not_upside_down = true;
+                                        ttt = 0;
+                                        tt = tiers;
+                                    }
+                                }
+                                if (!new_stack_because_not_upside_down) {
+                                    non_misoverlaid_stacks_necessary[ss][tt + 1] = initial_bay[s][t][1];
+                                    tt = tiers;
+                                    ss = stacks;
+                                }
+                            } else if (new_stack_because_not_upside_down && tt > 0 && initial_bay[s][t][1] <= non_misoverlaid_stacks_necessary[ss][tt]) {
+                                non_misoverlaid_stacks_necessary[ss][tt+1] = initial_bay[s][t][1];
+                                new_stack_because_not_upside_down = false;
+                                tt = tiers;
+                                ss = stacks;
+                            } else if (non_misoverlaid_stacks_necessary[ss][tt] == 0) {
+                                tt = tiers;
+                            } else if (initial_bay[s][t][1] > non_misoverlaid_stacks_necessary[ss][tt]) {
+                                tt = tiers;
+                            }
+                        }
+                    }
+                }
+                Set<Integer> minimum_group_value_ith_non_misoverlaid_stack = new TreeSet<>();
+                for (int ss = 0; ss < stacks; ss++) {
+                    if (non_misoverlaid_stacks_necessary[ss][0] != 0) {
+                        n_BG_s[s] += 1;
+                        minimum_group_value_ith_non_misoverlaid_stack.add(non_misoverlaid_stacks_necessary[ss][0]);
+                    }
+                }
+                TreeSet<Integer> minimum_group_value_ith_non_misoverlaid_stack_Reverse = (TreeSet<Integer>) ((TreeSet<Integer>) minimum_group_value_ith_non_misoverlaid_stack).descendingSet();
+                for (Integer group_value: minimum_group_value_ith_non_misoverlaid_stack_Reverse) {
+                    g_BG_si[s][indexOf(minimum_group_value_ith_non_misoverlaid_stack_Reverse, group_value)] = group_value;
+                }
 
-                n_BG_s[s] += 1;
                 minimum_group_values_for_repairing.add(group_t_last); //da last nur geupdated wird, wenn der upside-down-Teil durchlaufen wird, kann über last immer der fehlende minimum group value ermittelt werden
                 TreeSet<Integer> minimum_group_values_for_repairing_Reverse = (TreeSet<Integer>) ((TreeSet<Integer>) largest_misoverlaying_group_values).descendingSet();
                 for (Integer j: minimum_group_values_for_repairing_Reverse) {
@@ -1276,17 +1328,15 @@ public class Params {
     private static void compute__groups(int[][][] initial_bay, int stacks, int tiers) {
         //TODO: Wenn eine Gruppe nicht vorkommt, dann ist Berechnung falsch
         //TODO: Eine Konvention festlegen: Fängt bei 0 oder 1 an, können Gruppen ausgelassen werden, usw.
+        //Gruppe fängt bei 0 an und keine Gruppen dürfen ausgelassen werden.
         groups = 0;
-        //Set<Integer> diff_groups = new HashSet<>();
         for (int s = 0; s < stacks; s++) {
             for (int t = 0; t <= s_info[s][0]; t++) {
                 if (initial_bay[s][t][1] > groups) {
                     groups = initial_bay[s][t][1];
-                    //diff_groups.add(initial_bay[s][t][1]);
                 }
             }
         }
-        //groups = diff_groups.size();
     }
 
     private static void compute__n_g_s(int [][][] initial_bay, int stacks, int tiers) {
