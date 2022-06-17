@@ -34,15 +34,15 @@ public class PreMarshalling {
     //TODO: Aus allen LB's die größte auswählen
 
     public static void main (String [] args) throws FileNotFoundException {
-        String initial_bay_path = "/Users/luismasuchibanez/IdeaProjects/premarshalling_heuristics/data/Test/bay2.bay";
+        String initial_bay_path = "/Users/luismasuchibanez/IdeaProjects/premarshalling_heuristics/data/Test/LB_case1.bay";
         consider_time = true;
         multiple_bays = true;
-        print_info = true;
+        print_info = false;
         print_statistics = true;
         print_relocations = false;
 
         //Huang
-        correction = false;
+        correction = true;
         Params.beta = 0.2; //scheint am besten zu sein wenn beta_h <= 1
 
             try {

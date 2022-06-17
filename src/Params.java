@@ -716,7 +716,7 @@ public class Params {
                 block_in_W_found = false;
                 TreeSet<Integer> W_options = new TreeSet<>();
                 for (int s = 0; s < stacks; s++) {
-                    if (s_info[s][1] == 0 && s_info[empty_stack][0] == -1) {
+                    if (s != empty_stack && s_info[s][1] == 0 && s_info[empty_stack][0] == -1) {
                         block_in_W_found = true;
                         if (copy[s][s_info[s][0]][1] > biggest_prio_among_W) {
                             W_block = copy[s][s_info[s][0]][0] - 1;
@@ -736,7 +736,7 @@ public class Params {
                             W_options.add(W_block);
                             biggest_prio_among_W = copy[s][s_info[s][0]][1];
                         }
-                    } else if (s_info[s][1] == 0 && copy[s][s_info[s][0]][1] <= copy[empty_stack][s_info[empty_stack][0]][1]) {
+                    } else if (s != empty_stack &&  s_info[s][1] == 0 && copy[s][s_info[s][0]][1] <= copy[empty_stack][s_info[empty_stack][0]][1]) {
                         block_in_W_found = true;
                         if (copy[s][s_info[s][0]][1] > biggest_prio_among_W) {
                             W_block = copy[s][s_info[s][0]][0] - 1;
@@ -780,6 +780,7 @@ public class Params {
     public static void create_empty_stack(int[][][] copy, int[][] c_info, int[][] s_info, int stacks, int stacks_per_bay, int tiers, boolean multiple_bays, boolean consider_time) {
         //wenn kein einzelner empty stack erzeugt werden kann, weil keine destination stacks mit prio <= prio von Block aus source vorhanden, dann Block aus source trotzdem umlagern
         boolean stack_source_found = true;
+        boolean stack_destination_found = true;
         boolean all_W_stacks_exhausted = false;
         int [] stacks_checked = new int[stacks];
         int W_stack_source = 0;
@@ -803,7 +804,7 @@ public class Params {
             } else if (stack_options_empty.size() != 0 && consider_time) { //Zeit von prev_block zu next_stack_R berücksichtigen
                 W_stack_source = compute_nearest_stack(stack_options_empty, tiers, stacks_per_bay, c_info[Relocation.prev_block][0], s_info[c_info[Relocation.prev_block][0]][0], 0);
             }
-            boolean stack_destination_found = true;
+            stack_destination_found = true;
             while (stack_source_found && stack_destination_found && s_info[W_stack_source][0] != -1) {
                 //denjenigen W stack mit der niedrigsten Prio des obersten Blockes suchen, da so möglichst keine Blöcke, die bald umgelagert werden sollen, blockiert werden
                 //reicht, wenn Prio nicht kleiner ist als Block aus empty Stack → bei consider_time nächsten Stack mit Block mit kleiner/gleichen Prio
@@ -841,17 +842,16 @@ public class Params {
                             System.out.println("Create empty stack: Stack emptied!");
                         }
                         stack_source_found = false;
-                    } else {
-                        all_W_stacks_exhausted = true;
-                        for (int s = 0; s < stacks; s++) {
-                            if (s != W_stack_source && s_info[s][1] == 0 && s_info[s][0] != tiers-1) {
-                                all_W_stacks_exhausted = false;
-                                s = stacks;
-                            }
-                        }
                     }
                 } else {
-                    if (s_info[W_stack_source][1] == 1 && all_W_stacks_exhausted) {
+                    all_W_stacks_exhausted = true;
+                    for (int s = 0; s < stacks; s++) {
+                        if (s != W_stack_source && s_info[s][1] == 0 && s_info[s][0] != tiers-1) {
+                            all_W_stacks_exhausted = false;
+                            s = stacks;
+                        }
+                    }
+                    if (s_info[W_stack_source][1] == 1 || all_W_stacks_exhausted) {
                         stack_source_found = false;
                     }
                     stacks_checked[W_stack_source] = 1; //TODO: überflüssig?
@@ -863,7 +863,7 @@ public class Params {
             stack_source_found = true;
             stacks_checked = new int[stacks];
             while (stack_source_found) {
-                if (!all_W_stacks_exhausted) {
+                if (!all_W_stacks_exhausted || !stack_destination_found) {
                     stack_source_found = false;
                     W_stack_source = 0;
                     int source_height = 100000;
@@ -884,24 +884,49 @@ public class Params {
                         W_stack_source = compute_nearest_stack(stack_options_empty, tiers, stacks_per_bay, c_info[Relocation.prev_block][0], s_info[c_info[Relocation.prev_block][0]][0], 0);
                     }
                 }
-                boolean stack_destination_found = true;
+                stack_destination_found = true;
                 while (stack_source_found && stack_destination_found && s_info[W_stack_source][0] != -1) {
-                    //denjenigen R stack mit der geringsten zeitlichen Entfernung zu stack source auswählen, da der Block sowieso wieder umgelagert werden muss
-                    stack_destination_found = false;
-                    int W_stack_destination = 0;
-                    TreeSet<Integer> stack_options_W = new TreeSet<>();
+                    all_W_stacks_exhausted = true;
                     for (int s = 0; s < stacks; s++) {
-                        if (s_info[s][0] != tiers - 1 && s != W_stack_source && s_info[s][1] == 1) {
-                            stack_destination_found = true;
-                            stack_options_W.add(s);
+                        if (s != W_stack_source && s_info[s][1] == 0 && s_info[s][0] != tiers-1) {
+                            all_W_stacks_exhausted = false;
+                            s = stacks;
                         }
                     }
-                    if (stack_options_W.size() == 0) {
-                        stacks_checked[W_stack_source] = 1;
-                    } else if (stack_options_W.size() == 1 || !consider_time) {
-                        W_stack_destination = stack_options_W.first();
-                    } else if (consider_time) {
-                        W_stack_destination = compute_nearest_stack(stack_options_W, tiers, stacks_per_bay, W_stack_source, s_info[W_stack_source][0], 0);
+                    int W_stack_destination = 0;
+                    if (!all_W_stacks_exhausted) {
+                        stack_destination_found = false;
+                        TreeSet<Integer> stack_options_W = new TreeSet<>();
+                        for (int s = 0; s < stacks; s++) {
+                            if (s_info[s][0] != tiers - 1 && s != W_stack_source && s_info[s][1] == 0) {
+                                stack_destination_found = true;
+                                stack_options_W.add(s);
+                            }
+                        }
+                        if (stack_options_W.size() == 0) {
+                            stacks_checked[W_stack_source] = 1;
+                        } else if (stack_options_W.size() == 1 || !consider_time) {
+                            W_stack_destination = stack_options_W.first();
+                        } else if (consider_time) {
+                            W_stack_destination = compute_nearest_stack(stack_options_W, tiers, stacks_per_bay, W_stack_source, s_info[W_stack_source][0], 0);
+                        }
+                    } else {
+                        //denjenigen R stack mit der geringsten zeitlichen Entfernung zu stack source auswählen, da der Block sowieso wieder umgelagert werden muss
+                        stack_destination_found = false;
+                        TreeSet<Integer> stack_options_W = new TreeSet<>();
+                        for (int s = 0; s < stacks; s++) {
+                            if (s_info[s][0] != tiers - 1 && s != W_stack_source && s_info[s][1] == 1) {
+                                stack_destination_found = true;
+                                stack_options_W.add(s);
+                            }
+                        }
+                        if (stack_options_W.size() == 0) {
+                            stacks_checked[W_stack_source] = 1;
+                        } else if (stack_options_W.size() == 1 || !consider_time) {
+                            W_stack_destination = stack_options_W.first();
+                        } else if (consider_time) {
+                            W_stack_destination = compute_nearest_stack(stack_options_W, tiers, stacks_per_bay, W_stack_source, s_info[W_stack_source][0], 0);
+                        }
                     }
                     if (stack_destination_found) {
                         int block = copy[W_stack_source][s_info[W_stack_source][0]][0] - 1;
@@ -944,7 +969,7 @@ public class Params {
 
         int IBF_1 = compute__IBF_1(IBF_0, stacks, tiers);
 
-        int IBF_2 = compute__IBF_2(LB_F, IBF_0, stacks, tiers);
+        int IBF_2 = compute__IBF_2(LB_F, IBF_0, IBF_1, stacks, tiers);
 
         int IBF_3 = compute__IBF_3(LB_F, IBF_2);
 
@@ -1166,25 +1191,171 @@ public class Params {
         if (LB_F == IBF_2) { //IBF_3-Bedingung
             return LB_F + 1;
         } else {
-            return LB_F;
+            return IBF_2;
         }
     }
 
-    private static int compute__IBF_2(int LB_F, int IBF_0, int stacks, int tiers) {
+    private static int compute__IBF_2(int LB_F, int IBF_0, int IBF_1, int stacks, int tiers) {
         int IBF_2 = IBF_0;
         if (case_1 || case_2a || case_2b || case_3 || case_4) {
-            IBF_2 = IBF_0 + 1; //same as  IBF_2 = IBF_1
             if (case_1) {
-                //Bedingung IBF_1 = IBF_0 + 1 in dieser if-Bedingung automatisch erfüllt
-                //TODO: hier mit cases fortfahren
+                //proposition 4
+                //Bedingung IBF_1 = IBF_0 + 1 in dieser if-Bedingung automatisch erfüllt //condition 2
+                int min_m_ss = 1000000;
+                for (int s: U) {
+                    if (m_s[s] < min_m_ss) {
+                        min_m_ss = m_s[s];
+                    }
+                }
+                int max_w_s = 0;
+                for (int s = 0; s < stacks; s++) {
+                    if (n_M_s[s] == h_M + 1 && w_s[s] > max_w_s) {
+                        max_w_s = w_s[s];
+                    }
+                }
+                if (min_m_ss > max_w_s) { //condition 3
+                    int max_w_sec_s = 0;
+                    for (int s : S_minM) {
+                        if (w_sec_s[s] > max_w_sec_s) {
+                            max_w_sec_s = w_sec_s[s];
+                        }
+                    }
+                    if (min_m_ss > max_w_sec_s) { //condition 4
+                        int min_g_X_s = 100000;
+                        for (int s: Us) {
+                            if (g_X_s[s] < min_g_X_s) {
+                                min_g_X_s = g_X_s[s];
+                            }
+                        }
+                        max_w_s = 0;
+                        for (int s: S_minM) {
+                            if (w_s[s] > max_w_s) {
+                                max_w_s = w_s[s];
+                            }
+                        }
+                        if (min_g_X_s > max_w_s) { //condition 5
+                            IBF_2 = IBF_1 + 1;
+                        }
+                    }
+                }
+            } else if (case_2b) {
+                int s = 0; //index of non-misoverlaid stack
+                for (int ss: S_N) {
+                    s = ss;
+                }
+                //proposition 5
+                if (IBF_1 == IBF_0 + 1) { //condition 2
+                    int min_m_s = 100000;
+                    for (int ss: U) {
+                        if (m_s[ss] < min_m_s) {
+                            min_m_s = m_s[ss];
+                        }
+                    }
+                    if (min_m_s > w_sec_s[s]) { //condition 3
+                        int min_g_X_s = 100000;
+                        for (int ss: Us) {
+                            if (g_X_s[ss] < min_g_X_s) {
+                                min_g_X_s = g_X_s[ss];
+                            }
+                        }
+                        if (min_g_X_s > w_s[s]) { //condition 4
+                            IBF_2 = IBF_1 + 1;
+                        }
+                    }
+                }
+                //proposition 6
+                if (U.size() == 1) { //condition 2
+                    boolean condition_2 = false;
+                    int s_upside_down = 0;
+                    for (int ss: U) {
+                        if (g_top_s[ss] <= w_s[s]) { //condition 2
+                            condition_2 = true;
+                            s_upside_down = ss;
+                        }
+                    }
+                    if (condition_2) { //condition 2
+                        if (IBF_1 == IBF_0) { //condition 3
+                            boolean condition_4 = true;
+                            int [] w_s_s = new int [stacks];
+                            for (int sss = 0; sss < stacks; sss++) {
+                                if (n_gx > 0 && n_s[s] + n_M_s[s_upside_down] < tiers) {
+                                    w_s_s[sss] = w_sec_s[s_upside_down];
+                                } else {
+                                    w_s_s[sss] = w_s[s_upside_down];
+                                }
+                            }
+                            for (int ss: S_M) {
+                                if (ss != s_upside_down) {
+                                    if (!(n_BG_s[ss] > 2 || g_BG_si[ss][0] > Math.max(w_s_s[s], w_s_s[s_upside_down]) || g_BG_si[ss][1] > Math.min(w_s_s[s], w_s_s[s_upside_down]))) {
+                                        condition_4 = false;
+                                    }
+                                }
+                            }
+                            if (condition_4) { //condition 4
+                                IBF_2 = IBF_1 + 1;
+                            }
+                        }
+                    }
+                }
+            } else if (case_3) {
+                //proposition 7
+                int s_1 = 0;
+                int s_2 = 0;
+                for (int s: S_N) { //wegen condition 1 ist S_N.size() == 2 sichergestellt
+                    if (indexOf(S_N, s) == 0) {
+                        s_1 = s;
+                    } else {
+                        s_2 = s;
+                    }
+                }
+                int w_ss_s_1;
+                int w_ss_s_2;
+                if (w_s[s_1] < w_s[s_2] && n_s[s_2] == tiers) {
+                    w_ss_s_1 = w_s[s_1];
+                    w_ss_s_2 = -10000000;
+                } else {
+                    if (n_s[s_2] < tiers) {
+                        w_ss_s_1 = w_sec_s[s_1];
+                    } else {
+                        w_ss_s_1 = w_s[s_1];
+                    }
+                    if (n_s[s_1] < tiers && w_s[s_1] == w_s[s_2]) {
+                        w_ss_s_2 = w_sec_s[s_2];
+                    } else {
+                        w_ss_s_2 = w_s[s_2];
+                    }
+                }
+                if (IBF_1 == IBF_0) { //condition 2
+                    boolean condition_3 = true;
+                    for (int s: S_M) {
+                        if (!(n_BG_s[s] > 2 || g_BG_si[s][0] > Math.max(w_ss_s_1, w_ss_s_2) || g_BG_si[s][1] > Math.min(w_ss_s_1, w_ss_s_2))) {
+                            condition_3 = false;
+                        }
+                    }
+                    if (condition_3) { //condition 3
+                        IBF_2 = IBF_1 + 1;
+                    }
+                }
+            } else if (case_4) {
+                //proposition 8
+                int s = 0;
+                for (int ss: S_N) {
+                    s = ss;
+                }
+                if (n_gx == 0 && IBF_1 == IBF_0 + 1) { //condition 2 & 3
+                    int min_g_X_s = 100000;
+                    for (int ss: Us) {
+                        if (g_X_s[ss] < min_g_X_s) {
+                            min_g_X_s = g_X_s[ss];
+                        }
+                    }
+                    if (min_g_X_s > w_s[s]) { //condition 4
+                        IBF_2 = IBF_1 + 1;
+                    }
+                }
             }
-
-            return IBF_2;
-        } else if (LB_F == IBF_2) { //IBF_3-Bedingung
-            return IBF_0;
-        } else {
-            return IBF_0;
         }
+        return IBF_2;
     }
 
     private static int compute__IBF_1(int IBF_0, int stacks, int tiers) {
