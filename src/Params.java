@@ -25,6 +25,11 @@ public class Params {
     static int next_stack_R_low;
     static int next_stack_R_deconstruct;
     static int next_stack_W_deconstruct;
+    static int [] next_stack_R_low_checked;
+    static boolean deconstruct_low_R_stack = false;
+    //create empyt_stack
+    static int empty_stack;
+    static int step_empty_stack;
 
     //LB
     static int n_bx;
@@ -491,7 +496,8 @@ public class Params {
                     int prio = 0;
                     TreeSet<Integer> stack_options_W = new TreeSet<>();
                     for (int s = 0; s < stacks; s++) {
-                        if (s_info[s][1] == 0) {
+                        //wenn innerhalb von deconstruct_low_R_stack() complete_low_R_stack() aufgerufen wird, darf nicht der Block, der gerade umgelagert wurde zurück umgelagert werden (sonst loop)
+                        if (s_info[s][1] == 0 && !(deconstruct_low_R_stack && s == c_info[Relocation.prev_block][0])) {
                             if (copy[s][s_info[s][0]][1] <= next_stack_R_prio && copy[s][s_info[s][0]][1] > prio) {
                                 next_stack_W_found = true;
                                 prio = copy[s][s_info[s][0]][1];
@@ -548,8 +554,33 @@ public class Params {
 
     public static void deconstruct_low_R_stacks(int [][][] copy, int [][][] current_bay, int [][] c_info, int[][] s_info, int stacks, int stacks_per_bay, int tiers, boolean multiple_bays, boolean consider_time) {
         beta_h = beta * tiers;
+        /*
         boolean next_stack_R_low_found = true;
-        int [] next_stack_R_low_checked = new int [stacks];
+        next_stack_R_low_checked = new int [stacks];
+        deconstruct_low_R_stack = false;
+
+         */
+
+        boolean next_stack_R_low_found = false;
+        //verhindern, dass deconstructing bei allen low_R stacks nicht erfolgreich ist, sowie keine UMlagerungen stattfinden und im nächsten Durchgang erneut durchgeführt wird (loop)
+        if (PreMarshalling.step == 1) {
+            next_stack_R_low_found = true;
+        } else {
+            if (PreMarshalling.step ==200714) {
+                int d = 6;
+            }
+            if (PreMarshalling.relocation_count_current == Relocation.relocations_count) {
+                for (int s = 0; s < stacks; s++) {
+                    if (next_stack_R_low_checked[s] == 0 && s_info[s][0] != -1 && s_info[s][1] == 1 && s_info[s][0] < beta_h && s_info[s][0] != tiers - 1 && next_stack_R_low_checked[s] == 0 && s != c_info[Relocation.prev_block][0]) {
+                        next_stack_R_low_found = true;
+                        s = stacks;
+                    }
+                }
+            } else {
+                next_stack_R_low_found = true;
+            }
+        }
+        next_stack_R_low_checked = new int [stacks];
 
         while (next_stack_R_low_found && !Params.sorted) {
             //compute giving low R stack
@@ -562,7 +593,7 @@ public class Params {
                     stack_options_R_low.clear();
                     stack_options_R_low.add(s);
                     next_stack_R_low_prio = copy[s][s_info[s][0]][1];
-                } else if(s_info[s][0] != -1 && s_info[s][1] == 1 && s_info[s][0] < beta_h && s_info[s][0] != tiers - 1 && next_stack_R_low_checked[s] == 0 && s != c_info[Relocation.prev_block][0] && copy[s][s_info[s][0]][1] < next_stack_R_low_prio) {
+                } else if(s_info[s][0] != -1 && s_info[s][1] == 1 && s_info[s][0] < beta_h && s_info[s][0] != tiers - 1 && next_stack_R_low_checked[s] == 0 && s != c_info[Relocation.prev_block][0] && copy[s][s_info[s][0]][1] == next_stack_R_low_prio) {
                     stack_options_R_low.add(s);
                 }
             }
@@ -602,6 +633,7 @@ public class Params {
                         if (PreMarshalling.print_info) {
                             System.out.println("Deconstruct low R stack! Move from R_low to R.");
                         }
+                        deconstruct_low_R_stack = true;
                         int candidate_block = copy[next_stack_R_low][s_info[next_stack_R_low][0]][0] - 1;
                         Relocation.relocate(c_info, s_info, candidate_block, next_stack_R_low_prio, next_stack_R_deconstruct, tiers, stacks_per_bay, multiple_bays);
                         current_bay = BayInstance.copy_bay(Relocation.copy, current_bay, stacks, tiers);
@@ -665,11 +697,14 @@ public class Params {
                                 if (PreMarshalling.print_info) {
                                     System.out.println("Deconstruct low R stack! Move from R_low to W.");
                                 }
+                                deconstruct_low_R_stack = true;
                                 int candidate_block = copy[next_stack_R_low][s_info[next_stack_R_low][0]][0] - 1;
                                 Relocation.relocate(c_info, s_info, candidate_block, next_stack_R_low_prio, next_stack_W_deconstruct, tiers, stacks_per_bay, multiple_bays);
                                 current_bay = BayInstance.copy_bay(Relocation.copy, current_bay, stacks, tiers);
                                 PreMarshalling.relocations.addAll(PreMarshalling.relocations_on_hold);
-
+                                if (Relocation.prev_block == 7) {
+                                    int d = 9;
+                                }
                                 Params.complete_low_R_stacks(copy, current_bay, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
                                 PreMarshalling.relocations.addAll(PreMarshalling.relocations_on_hold);
 
@@ -696,7 +731,7 @@ public class Params {
         int empty_stack = 0;
         TreeSet<Integer> stack_options_empty = new TreeSet<>();
         for (int s = 0; s < stacks; s++) {
-            if (s_info[s][0] == -1) {
+            if (s_info[s][0] == -1 && ! (s == empty_stack && PreMarshalling.step == step_empty_stack + 1)) {
                 empty_stack_found = true;
                 stack_options_empty.add(s);
             }
@@ -716,7 +751,8 @@ public class Params {
                 block_in_W_found = false;
                 TreeSet<Integer> W_options = new TreeSet<>();
                 for (int s = 0; s < stacks; s++) {
-                    if (s != empty_stack && s_info[s][1] == 0 && s_info[empty_stack][0] == -1) {
+                    //TODO: brauche ich erste Bedingung?
+                    if (s != c_info[Relocation.prev_block][0] && s != empty_stack && s_info[s][1] == 0 && s_info[empty_stack][0] == -1) {
                         block_in_W_found = true;
                         if (copy[s][s_info[s][0]][1] > biggest_prio_among_W) {
                             W_block = copy[s][s_info[s][0]][0] - 1;
@@ -736,7 +772,8 @@ public class Params {
                             W_options.add(W_block);
                             biggest_prio_among_W = copy[s][s_info[s][0]][1];
                         }
-                    } else if (s != empty_stack &&  s_info[s][1] == 0 && copy[s][s_info[s][0]][1] <= copy[empty_stack][s_info[empty_stack][0]][1]) {
+                    }//TODO: sicherstellen, dass s_info[empty_stack][0] != -1
+                    else if (s != c_info[Relocation.prev_block][0] && s != empty_stack &&  s_info[s][1] == 0 && copy[s][s_info[s][0]][1] <= copy[empty_stack][s_info[empty_stack][0]][1]) {
                         block_in_W_found = true;
                         if (copy[s][s_info[s][0]][1] > biggest_prio_among_W) {
                             W_block = copy[s][s_info[s][0]][0] - 1;
@@ -773,6 +810,16 @@ public class Params {
                     int W_block_prio = c_info[W_block][2];
                     Relocation.relocate(c_info, s_info, W_block, W_block_prio, empty_stack, tiers, stacks_per_bay, multiple_bays);
                 }
+            }
+        } else if (!empty_stack_found && PreMarshalling.relocation_count_current == Relocation.relocations_count && step_empty_stack + 1 == PreMarshalling.step) {
+            if (beta < 1) {
+                beta += 0.1;
+                System.out.println("Beta increased by 0.1");
+            } else {
+            System.out.println("No solution found!");
+            PreMarshalling.solution_found = false;
+            //TODO: vermerken, dass keine Lösung gefunden wurde
+            System.exit(0);
             }
         }
     }
@@ -841,6 +888,8 @@ public class Params {
                         if (PreMarshalling.print_info) {
                             System.out.println("Create empty stack: Stack emptied!");
                         }
+                        empty_stack = W_stack_source;
+                        step_empty_stack = PreMarshalling.step;
                         stack_source_found = false;
                     }
                 } else {
@@ -939,6 +988,8 @@ public class Params {
                             if (PreMarshalling.print_info) {
                                 System.out.println("Create empty stack: Stack emptied!");
                             }
+                            empty_stack = W_stack_source;
+                            step_empty_stack = PreMarshalling.step;
                             stack_source_found = false;
                         }
                     } else {
@@ -1196,7 +1247,7 @@ public class Params {
     }
 
     private static int compute__IBF_2(int LB_F, int IBF_0, int IBF_1, int stacks, int tiers) {
-        int IBF_2 = IBF_0;
+        int IBF_2 = IBF_1;
         if (case_1 || case_2a || case_2b || case_3 || case_4) {
             if (case_1) {
                 //proposition 4
@@ -1234,11 +1285,12 @@ public class Params {
                             }
                         }
                         if (min_g_X_s > max_w_s) { //condition 5
-                            IBF_2 = IBF_1 + 1;
+                            IBF_2 += 1;
                         }
                     }
                 }
-            } else if (case_2b) {
+            }
+            if (case_2b) {
                 int s = 0; //index of non-misoverlaid stack
                 for (int ss: S_N) {
                     s = ss;
@@ -1259,7 +1311,7 @@ public class Params {
                             }
                         }
                         if (min_g_X_s > w_s[s]) { //condition 4
-                            IBF_2 = IBF_1 + 1;
+                            IBF_2 += 1;
                         }
                     }
                 }
@@ -1292,12 +1344,13 @@ public class Params {
                                 }
                             }
                             if (condition_4) { //condition 4
-                                IBF_2 = IBF_1 + 1;
+                                IBF_2 += 1;
                             }
                         }
                     }
                 }
-            } else if (case_3) {
+            }
+            if (case_3) {
                 //proposition 7
                 int s_1 = 0;
                 int s_2 = 0;
@@ -1333,10 +1386,11 @@ public class Params {
                         }
                     }
                     if (condition_3) { //condition 3
-                        IBF_2 = IBF_1 + 1;
+                        IBF_2 += 1;
                     }
                 }
-            } else if (case_4) {
+            }
+            if (case_4) {
                 //proposition 8
                 int s = 0;
                 for (int ss: S_N) {
@@ -1350,7 +1404,7 @@ public class Params {
                         }
                     }
                     if (min_g_X_s > w_s[s]) { //condition 4
-                        IBF_2 = IBF_1 + 1;
+                        IBF_2 += 1;
                     }
                 }
             }

@@ -295,6 +295,7 @@ public class Relocation implements Comparable<Relocation> {
             if (PreMarshalling.print_info) {
                 System.out.println("Illegal move!");
             }
+            PreMarshalling.solution_found = false;
             System.exit(0);
         }
 
@@ -596,6 +597,7 @@ public class Relocation implements Comparable<Relocation> {
             }
         } else {
             System.out.println("DEADLOCK! No next_option found.");
+            PreMarshalling.solution_found = false;
             System.exit(0);
         }
     }

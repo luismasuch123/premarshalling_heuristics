@@ -20,6 +20,8 @@ public class PreMarshalling {
     static double time_relocations; //keine Leerfahrten berücksichtigt, ohne Lastaufnahme und -abgabe
     static double time_total; //ohne Lastaufnahme und -abgabe
 
+    static boolean solution_found = true;
+
     //Jovanovic
     static String next_selection = "function h_c"; //"highest due date value"
     static String stack_selection = "The Lowest Position";//"The Lowest Position", "Lowest Priority Index", "MinMax"
@@ -30,19 +32,20 @@ public class PreMarshalling {
 
     //LB
     static int lower_bound_moves;
-    static String lower_bound_method = "IBF_1"; //"LB_F", "IBF_0", "IBF_1", "IBF_2", "IBF_3", "IBF_4"
+    static String lower_bound_method = "IBF_2"; //"LB_F", "IBF_0", "IBF_1", "IBF_2", "IBF_3", "IBF_4"
     //TODO: Aus allen LB's die größte auswählen
+    //TODO: IBF_2 cases 2b, 3 und 4 fixen
 
     public static void main (String [] args) throws FileNotFoundException {
-        String initial_bay_path = "/Users/luismasuchibanez/IdeaProjects/premarshalling_heuristics/data/Test/LB_case1.bay";
-        consider_time = true;
+        String initial_bay_path = "/Users/luismasuchibanez/IdeaProjects/premarshalling_heuristics/data/Test/LB_case4.bay";
+        consider_time = false;
         multiple_bays = true;
         print_info = false;
         print_statistics = true;
         print_relocations = false;
 
         //Huang
-        correction = true;
+        correction = false;
         Params.beta = 0.2; //scheint am besten zu sein wenn beta_h <= 1
 
             try {
@@ -92,6 +95,8 @@ public class PreMarshalling {
             if (method.equals("Jovanovic")) {
                 final_bay = premarshall_Jovanovic(initial_bay, stacks, stacks_per_bay, tiers, containers, Relocation.order_relocations, Relocation.same_stack_under, Relocation.same_stack_below);
             } else if (method.equals("Huang")) {
+                //TODO: Relocations und alles weitere nach Jovanovic zurücksetzen
+                //TODO: Wenn System.exit() sollen andere methods trotzdem durchlaufen!
                 final_bay = premarshall_Huang(initial_bay, stacks, stacks_per_bay, tiers, containers);
             }
 
@@ -111,6 +116,7 @@ public class PreMarshalling {
                     System.out.println("Deadlocks: " + Relocation.deadlock_count);
                 }
                 System.out.println("True number relocations: " + relocations.size());
+                System.out.println("Solution found: " + solution_found);
             }
             if (print_relocations) {
                 for (Relocation relocation : relocations) {
@@ -184,6 +190,7 @@ public class PreMarshalling {
             Params.check_sorted(stacks);
 
             //deconstruct the low R stacks
+            //TODO: wenn im letzten step alle low_R stacks nicht erfolgreich deconstructed wurden, dann nicht zulassen, dass sie wieder deconstructed werden!
             if (!Params.sorted) {
                 Params.deconstruct_low_R_stacks(copy, current_bay, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
             }
@@ -294,6 +301,7 @@ public class PreMarshalling {
     private static void correction() {
         Relocation last = new Relocation(0, 0, 0, 0, 0, 0);
         int [] last_relocation_count = new int[relocations.size()];
+        //TODO: relocation_count stimmt nicht mit relocations.size() überein
         boolean correction_needed = true;
         while(correction_needed) {
             correction_needed = false;
@@ -308,7 +316,8 @@ public class PreMarshalling {
                     int next_stack = next.next_stack;
                     int prev_tier = last.prev_tier;
                     int next_tier = next.next_tier;
-                    last_relocation_count[last.relocation_count] = 1;
+                    last_relocation_count[last.relocation_count] = 1; //TODO: korrigieren
+                    //last_relocation_count[relocations.size()-1] = 1;
                     it.remove();
                     if (prev_stack != next_stack) {
                         relocations.add(new Relocation(relocations_count, block, prev_stack, next_stack, prev_tier, next_tier));
@@ -320,7 +329,7 @@ public class PreMarshalling {
                 Iterator<Relocation> itt = relocations.iterator();
                 boolean correction_done = false;
                 while (itt.hasNext() && correction_needed && !correction_done) {
-                    if (last_relocation_count[itt.next().relocation_count] == 1) {
+                    if (last_relocation_count[itt.next().relocation_count] == 1) { //TODO: IndexOutOfBounds
                         itt.remove();
                         correction_done = true;
                     }
