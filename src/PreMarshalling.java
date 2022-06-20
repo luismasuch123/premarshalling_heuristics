@@ -34,45 +34,46 @@ public class PreMarshalling {
     static int lower_bound_moves;
     static String lower_bound_method = "IBF_2"; //"LB_F", "IBF_0", "IBF_1", "IBF_2", "IBF_3", "IBF_4"
     //TODO: Aus allen LB's die größte auswählen
-    //TODO: IBF_2 cases 2b, 3 und 4 fixen
 
     public static void main (String [] args) throws FileNotFoundException {
         String initial_bay_path = "/Users/luismasuchibanez/IdeaProjects/premarshalling_heuristics/data/Test/LB_case4.bay";
-        consider_time = false;
+        consider_time = true;
         multiple_bays = true;
         print_info = false;
         print_statistics = true;
         print_relocations = false;
 
         //Huang
-        correction = false;
+        correction = true;
         Params.beta = 0.2; //scheint am besten zu sein wenn beta_h <= 1
 
             try {
                 BayInstance instance = BayInstance.get_initial_bay(initial_bay_path, multiple_bays);
                 for (String m: method) {
-                    reset_statistics();
-                    System.out.println("\n" + m.toUpperCase() + "\n");
-                    if (multiple_bays) {
-                        int[][][] initial_bay = instance.initial_bay;
-                        int stacks = instance.stacks;
-                        int stacks_per_bay = instance.stacks_per_bay;
-                        int tiers = instance.tiers;
-                        int containers = instance.containers;
-
-                        run_methods(instance, m, initial_bay, stacks, stacks_per_bay, tiers, containers);
-
-                    } else {
-                        int stacks = instance.stacks_per_bay;
-                        int stacks_per_bay = instance.stacks_per_bay;
-                        int tiers = instance.tiers;
-                        for (int b = 0; b < instance.bays; b++) {
-                            Relocation.current_bay = b;
-                            step = 0;
-                            int containers = instance.containers_per_bay[b];
-                            int[][][] initial_bay = instance.initial_bays[b];
+                    if (m.equals("LB")) {
+                        reset_statistics();
+                        System.out.println("\n" + m.toUpperCase() + "\n");
+                        if (multiple_bays) {
+                            int[][][] initial_bay = instance.initial_bay;
+                            int stacks = instance.stacks;
+                            int stacks_per_bay = instance.stacks_per_bay;
+                            int tiers = instance.tiers;
+                            int containers = instance.containers;
 
                             run_methods(instance, m, initial_bay, stacks, stacks_per_bay, tiers, containers);
+
+                        } else {
+                            int stacks = instance.stacks_per_bay;
+                            int stacks_per_bay = instance.stacks_per_bay;
+                            int tiers = instance.tiers;
+                            for (int b = 0; b < instance.bays; b++) {
+                                Relocation.current_bay = b;
+                                step = 0;
+                                int containers = instance.containers_per_bay[b];
+                                int[][][] initial_bay = instance.initial_bays[b];
+
+                                run_methods(instance, m, initial_bay, stacks, stacks_per_bay, tiers, containers);
+                            }
                         }
                     }
                 }
@@ -300,15 +301,16 @@ public class PreMarshalling {
 
     private static void correction() {
         Relocation last = new Relocation(0, 0, 0, 0, 0, 0);
-        int [] last_relocation_count = new int[relocations.size()];
-        //TODO: relocation_count stimmt nicht mit relocations.size() überein
+        int number_relocations = relocations.size();
+        int [] last_relocation_count = new int[number_relocations];
         boolean correction_needed = true;
         while(correction_needed) {
             correction_needed = false;
             Iterator<Relocation> it = relocations.iterator();
             while (it.hasNext() && !correction_needed) {
                 Relocation next = it.next();
-                if (next.block == last.block) {
+                //sicherstellen, dass nicht letzter Block nach correction mit erstem verglichen wird
+                if (next.block == last.block && next.relocation_count != 1) {
                     correction_needed = true;
                     int relocations_count = next.relocation_count;
                     int block = next.block;
@@ -316,8 +318,7 @@ public class PreMarshalling {
                     int next_stack = next.next_stack;
                     int prev_tier = last.prev_tier;
                     int next_tier = next.next_tier;
-                    last_relocation_count[last.relocation_count] = 1; //TODO: korrigieren
-                    //last_relocation_count[relocations.size()-1] = 1;
+                    last_relocation_count[last.relocation_count-1] = 1;
                     it.remove();
                     if (prev_stack != next_stack) {
                         relocations.add(new Relocation(relocations_count, block, prev_stack, next_stack, prev_tier, next_tier));
@@ -329,8 +330,9 @@ public class PreMarshalling {
                 Iterator<Relocation> itt = relocations.iterator();
                 boolean correction_done = false;
                 while (itt.hasNext() && correction_needed && !correction_done) {
-                    if (last_relocation_count[itt.next().relocation_count] == 1) { //TODO: IndexOutOfBounds
+                    if (last_relocation_count[itt.next().relocation_count-1] == 1) {
                         itt.remove();
+                        last_relocation_count = new int [number_relocations];
                         correction_done = true;
                     }
                 }

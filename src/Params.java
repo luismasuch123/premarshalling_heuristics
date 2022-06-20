@@ -562,16 +562,14 @@ public class Params {
          */
 
         boolean next_stack_R_low_found = false;
-        //verhindern, dass deconstructing bei allen low_R stacks nicht erfolgreich ist, sowie keine UMlagerungen stattfinden und im nächsten Durchgang erneut durchgeführt wird (loop)
+        //verhindern, dass deconstructing bei allen low_R stacks nicht erfolgreich ist, sowie keine Umlagerungen stattfinden und im nächsten Durchgang erneut durchgeführt wird (loop)
+        //Abfrage bereits hier notwendig, da sonst next_stack_R_low_checked reinitialisiert wird
         if (PreMarshalling.step == 1) {
             next_stack_R_low_found = true;
         } else {
-            if (PreMarshalling.step ==200714) {
-                int d = 6;
-            }
             if (PreMarshalling.relocation_count_current == Relocation.relocations_count) {
                 for (int s = 0; s < stacks; s++) {
-                    if (next_stack_R_low_checked[s] == 0 && s_info[s][0] != -1 && s_info[s][1] == 1 && s_info[s][0] < beta_h && s_info[s][0] != tiers - 1 && next_stack_R_low_checked[s] == 0 && s != c_info[Relocation.prev_block][0]) {
+                    if (s_info[s][0] != -1 && s_info[s][1] == 1 && s_info[s][0] < beta_h && s_info[s][0] != tiers - 1 && next_stack_R_low_checked[s] == 0 && s != c_info[Relocation.prev_block][0]) {
                         next_stack_R_low_found = true;
                         s = stacks;
                     }
@@ -702,9 +700,7 @@ public class Params {
                                 Relocation.relocate(c_info, s_info, candidate_block, next_stack_R_low_prio, next_stack_W_deconstruct, tiers, stacks_per_bay, multiple_bays);
                                 current_bay = BayInstance.copy_bay(Relocation.copy, current_bay, stacks, tiers);
                                 PreMarshalling.relocations.addAll(PreMarshalling.relocations_on_hold);
-                                if (Relocation.prev_block == 7) {
-                                    int d = 9;
-                                }
+
                                 Params.complete_low_R_stacks(copy, current_bay, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
                                 PreMarshalling.relocations.addAll(PreMarshalling.relocations_on_hold);
 
@@ -751,7 +747,6 @@ public class Params {
                 block_in_W_found = false;
                 TreeSet<Integer> W_options = new TreeSet<>();
                 for (int s = 0; s < stacks; s++) {
-                    //TODO: brauche ich erste Bedingung?
                     if (s != c_info[Relocation.prev_block][0] && s != empty_stack && s_info[s][1] == 0 && s_info[empty_stack][0] == -1) {
                         block_in_W_found = true;
                         if (copy[s][s_info[s][0]][1] > biggest_prio_among_W) {
@@ -814,7 +809,9 @@ public class Params {
         } else if (!empty_stack_found && PreMarshalling.relocation_count_current == Relocation.relocations_count && step_empty_stack + 1 == PreMarshalling.step) {
             if (beta < 1) {
                 beta += 0.1;
-                System.out.println("Beta increased by 0.1");
+                if (PreMarshalling.print_info) {
+                    System.out.println("Beta increased by 0.1");
+                }
             } else {
             System.out.println("No solution found!");
             PreMarshalling.solution_found = false;
@@ -903,7 +900,7 @@ public class Params {
                     if (s_info[W_stack_source][1] == 1 || all_W_stacks_exhausted) {
                         stack_source_found = false;
                     }
-                    stacks_checked[W_stack_source] = 1; //TODO: überflüssig?
+                    stacks_checked[W_stack_source] = 1;
                     PreMarshalling.current_bay = BayInstance.copy_bay(Relocation.copy, PreMarshalling.current_bay, stacks, tiers);
                 }
             }
@@ -1011,12 +1008,11 @@ public class Params {
     }
 
     public static int compute_params_LB(int [][][] initial_bay, int stacks, int stacks_per_bay, int tiers, int containers) {
-        //TODO: Hat Anzahl groups Auswirkung auf Parameter bzw. hat irgendein ein array die Länge groups?
+        compute__params_IBF(initial_bay, stacks, tiers);
+
         int LB_F = compute__LB_F(initial_bay, stacks, tiers);
 
-        int IBF_0 = compute__IBF_0(initial_bay, stacks, tiers, true);
-
-        compute__params_IBF(initial_bay, stacks, tiers);
+        int IBF_0 = compute__IBF_0(stacks, tiers);
 
         int IBF_1 = compute__IBF_1(IBF_0, stacks, tiers);
 
@@ -1024,7 +1020,7 @@ public class Params {
 
         int IBF_3 = compute__IBF_3(LB_F, IBF_2);
 
-        int IBF_4 = 0;
+        int IBF_4 = compute__IBF_4(initial_bay, LB_F, IBF_3, stacks);
 
         switch (PreMarshalling.lower_bound_method) {
             case "LB_F" -> {
@@ -1048,6 +1044,75 @@ public class Params {
         }
 
         return compute__n_m(stacks, tiers);
+    }
+
+    private static int compute__IBF_4(int [][][] initial_bay, int LB_F, int IBF_3, int stacks) {
+        int IBF_4 = IBF_3;
+        if (LB_F == IBF_3) {
+            for (int g = 0; g < groups-1; g++) {
+                if (d_s_g_cum[g+1] == 0) {
+                    for (int gks = 0; gks <= g; gks++) {
+                        for (int gkb = gks; gkb <= g; gkb++) {
+                            int min_dirty_height = 1000000;
+                            for (int gs = gks; gs <= gkb; gs++) {
+                                Set<Integer> clean_supply_stacks = new HashSet<>();
+                                Set<Integer> clean_demand_stacks = new HashSet<>();
+                                Set<Integer> dirty_stacks = new HashSet<>();
+                                boolean [] demand_stack = new boolean [stacks];
+                                boolean [] supply_stack = new boolean[stacks];
+                                int [] dirty_height = new int [stacks];
+                                int [] demand = new int [stacks];
+                                int [] supply = new int [stacks];
+                                for (int s = 0; s < stacks; s++) {
+                                    for (int i = 0; i < n_M_s[s] - 1; i++) {
+                                        if (gs <= m_i_s[i][s] && m_i_s[i][s] <= gkb) {
+                                            demand_stack[s] = true;
+                                        }
+                                    }
+                                    if (gs <= w_s[s] && w_s[s] <= gkb) {
+                                        supply_stack[s] = true;
+                                    }
+                                    if (demand_stack[s] && supply_stack[s]) {
+                                        dirty_stacks.add(s);
+                                    }  else if (demand_stack[s]) {
+                                        clean_demand_stacks.add(s);
+                                    } else if (supply_stack[s]) {
+                                        clean_supply_stacks.add(s);
+                                    }
+                                    for (int t = 0; t < n_s[s]; t++) {
+                                        if (initial_bay[s][t][1] == gs) {
+                                            demand[s] += d_g[gs];
+                                            supply[s] += s_p_g[gs];
+                                            if (dirty_stacks.contains(s) && d_g[gs] > 0) {
+                                                dirty_height[s] += 1; //TODO: total number of dirty demands in a dirty stack
+                                            }
+                                        }
+                                    }
+                                    if (dirty_height[s] < min_dirty_height) {
+                                        min_dirty_height = dirty_height[s];
+                                    }
+                                }
+                                boolean condition_1 = false;
+                                boolean condition_2 = false;
+                                boolean condition_3 = false;
+                                for (int s = 0; s < stacks; s++) {
+                                    if (dirty_stacks.contains(s) && min_dirty_height > supply[s]) {
+                                        condition_1 = true;
+                                    } else if (clean_supply_stacks.size() == 1 && dirty_stacks.size() == 0 && clean_demand_stacks.size() >= 1) {
+                                        //TODO: condition_2 weiter ausführen
+                                    }
+                                }
+                                //TODO: conditions
+                                if (condition_1 || condition_2 || condition_3) {
+                                    IBF_4 += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return IBF_4;
     }
 
     private static void compute__params_IBF(int[][][] initial_bay, int stacks, int tiers) {
@@ -1155,7 +1220,7 @@ public class Params {
                         if (initial_bay[s][s_info[s][0]][1] > initial_bay[s][s_info[s][0] - 1][1]) {
                             g_X_s[s] = initial_bay[s][s_info[s][0]][1];
                         } else if (initial_bay[s][s_info[s][0]][1] < initial_bay[s][s_info[s][0] - 1][1]) {
-                            g_X_s[s] = initial_bay[s][s_info[s][0] - 1][1]; //TODO: wenn man die kleinere Prio /den oberen Block bewegen würde hätte man es erstmal einfacher, wäre aber auf lange Sicht wohl weniger sinnvoll
+                            g_X_s[s] = initial_bay[s][s_info[s][0] - 1][1];
                         }
                     } else {
                         g_X_s[s] = initial_bay[s][s_info[s][0]][1];
@@ -1326,7 +1391,7 @@ public class Params {
                         }
                     }
                     if (condition_2) { //condition 2
-                        if (IBF_1 == IBF_0) { //condition 3
+                        if (LB_F == IBF_0) { //condition 3 //TODO: IBF_1 == IBF_0 geht gar nicht, wenn case 2b, ergibt IBF_0 == LB_F mehr Sinn?
                             boolean condition_4 = true;
                             int [] w_s_s = new int [stacks];
                             for (int sss = 0; sss < stacks; sss++) {
@@ -1378,7 +1443,7 @@ public class Params {
                         w_ss_s_2 = w_s[s_2];
                     }
                 }
-                if (IBF_1 == IBF_0) { //condition 2
+                if (LB_F == IBF_0) { //condition 2 //TODO: IBF_1 == IBF_0 kann mit case_3 nicht true sein
                     boolean condition_3 = true;
                     for (int s: S_M) {
                         if (!(n_BG_s[s] > 2 || g_BG_si[s][0] > Math.max(w_ss_s_1, w_ss_s_2) || g_BG_si[s][1] > Math.min(w_ss_s_1, w_ss_s_2))) {
@@ -1419,20 +1484,21 @@ public class Params {
         case_2b = false;
         case_3 = false;
         case_4 = false;
-        int stacks_ordered = 0; //TODO: kann ersetzt werden durch size(S_N)
+        int stacks_ordered = S_N.size(); //TODO: kann ersetzt werden durch size(S_N)
         int ordered_stacks_not_full = 0;
 
         for (int s = 0; s < stacks; s++) {
-            if (s_info[s][1] == 1) {
+            if (S_N.contains(s)) {
                 case_1 = false;
-                stacks_ordered++;
-                if (s_info[s][0] != tiers - 1) {
+                if (n_s[s] != tiers) {
                     ordered_stacks_not_full++;
                 }
-            } else if (s_info[s][1] == 1 && s_info[s][0] != tiers - 1) {
-                case_2a = true;
-            } else if (s_info[s][0] == tiers - 1) {
-                case_2b = true;
+                if (S_N.size() == 1 && n_s[s] != tiers) {
+                    case_2a = true;
+                    case_2b = true;
+                } else if (S_N.size() == 1) {
+                    case_2b = true;
+                }
             }
         }
         if (stacks_ordered == 2 && ordered_stacks_not_full >= 1) {
@@ -1448,15 +1514,26 @@ public class Params {
         }
     }
 
-    private static int compute__IBF_0(int[][][] initial_bay, int stacks, int tiers, boolean IBF_0_extension) {
+    private static int compute__IBF_0(int stacks, int tiers) {
         //wenn alle geordneten stacks voll sind, kann wie im Fall, dass alle stacks ungeordnet sind, n_b_s_min addiert werden
-        compute__n_b__n_b_s(initial_bay, stacks, tiers, IBF_0_extension);
-        return compute__n_m(stacks, tiers);
+        //TODO: Cases für LB_F += 1 berechnen
+        int IBF_0;
+        boolean all_non_misoverlaid_full = false;
+        for (int s: S_N) {
+            if (n_s[s] == tiers) {
+                all_non_misoverlaid_full = true;
+            }
+        }
+        if (S_M.size() == stacks || all_non_misoverlaid_full) {
+            IBF_0 = n_M + h_M + n_gx;
+        } else {
+            IBF_0 = n_M + n_gx;
+        }
+        return IBF_0;
     }
 
     private static int compute__LB_F(int[][][] initial_bay, int stacks, int tiers) {
         compute__groups(initial_bay, stacks, tiers);
-        compute__n_b__n_b_s(initial_bay, stacks, tiers, false);
         compute__n_g_s(initial_bay, stacks, tiers);
         compute__d_g__d_g_cum(initial_bay, stacks, tiers);
         compute__s_p_g__s_p_g_cum(initial_bay, stacks, tiers);
@@ -1466,7 +1543,11 @@ public class Params {
     }
 
     private static int compute__n_m(int stacks, int tiers) {
-        n_bx = n_b + n_b_s_min;
+        if (S_M.size() == stacks) {
+            n_bx = n_M + h_M;
+        } else {
+            n_bx = n_M;
+        }
 
         int n_s_gx = Math.max(0, d_s_g_cum_max[0] / tiers);
         //stacks werden nach n_g_s aufsteigend sortiert , um dann die n_g_s in den ersten n_s_gx stacks aufzusummieren
@@ -1574,29 +1655,6 @@ public class Params {
                         n_g_s[g][s] += 1;
                     }
                 }
-            }
-        }
-    }
-
-    private static void compute__n_b__n_b_s(int [][][] initial_bay, int stacks, int tiers, boolean IBF_0_extension) {
-        n_b = 0;
-        n_b_s = new int[stacks];
-        n_b_s_min = 100000;
-        for (int s = 0; s < stacks; s++) {
-            if (s_info[s][1] == 0) {
-                for (int t = 0; t <= s_info[s][0]; t++) {
-                    if (initial_bay[s][t][2] == 0) {
-                        n_b += 1;
-                        n_b_s[s] += 1;
-                    }
-                }
-                if (n_b_s[s] < n_b_s_min) {
-                    n_b_s_min = n_b_s[s];
-                }
-            } else if (IBF_0_extension && s_info[s][0] != tiers-1) {
-                n_b_s_min = 0;
-            } else if (!IBF_0_extension){
-                n_b_s_min = 0;
             }
         }
     }
