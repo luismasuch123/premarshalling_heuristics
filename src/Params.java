@@ -36,7 +36,7 @@ public class Params {
     static int n_gx;
     //sets
     static Set<Integer> S_M = new HashSet<>(); //Set of misoverlaid stacks.
-    static Set<Integer> S_minM = new HashSet<>(); //Set of misoverlaid stacks with the minimum number of misoverlaying contaienrs. TODO: Berechnung
+    static Set<Integer> S_minM = new HashSet<>(); //Set of misoverlaid stacks with the minimum number of misoverlaying contaienrs.
     static Set<Integer> S_N = new HashSet<>(); //Set of non-misoverlaid stacks.
     static Set<Integer> U = new HashSet<>(); //Set of stacks where the misoverlaying containers are "upside-down" sorted
     static Set<Integer> Us = new HashSet<>(); //Set of stacks that would be upside down if one misoverlaying containers was removed. We assume U C Us.
@@ -221,7 +221,7 @@ public class Params {
 
     public static double get_time(int stack_from, int stack_to, int tier_from, int tier_to, int tiers, int stacks_per_bay) {
         //TODO: Beschleunigung berücksichtigen?
-        return (double) Math.abs(stack_from/stacks_per_bay - stack_to/stacks_per_bay) * 2 * 1.875 + (double) Math.abs(stack_from % stacks_per_bay - stack_to % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - tier_from) + (tiers - tier_to)) * 2 * 15.0;
+        return (double) Math.abs(stack_from/stacks_per_bay - stack_to/stacks_per_bay) * 2 * PreMarshalling.speed_bays + (double) Math.abs(stack_from % stacks_per_bay - stack_to % stacks_per_bay) * 2 * PreMarshalling.speed_stacks + (double) ((tiers - tier_from) + (tiers - tier_to)) * 2 * PreMarshalling.speed_tiers;
     }
 
     public static void compute__f_c_s__nw_c_s(int [][][] copy, int stacks, int tiers, int containers) {
@@ -539,6 +539,7 @@ public class Params {
                     Params.compute__c_info__s_info(copy, stacks, tiers);
                     //Wenn die relocations rückgängig gemacht werden, müssen sie auch aus relocations_on_hold gelöscht werden
                     PreMarshalling.relocations_on_hold.clear();
+                    //TODO: Relocation.relocations_count = PreMarshalling.relocations.size();
                 } else {
                     if (PreMarshalling.print_info) {
                         System.out.println("Next_stack_R " + next_stack_R + " does reach or exceed beta_h " + beta_h + ".");
@@ -767,7 +768,7 @@ public class Params {
                             W_options.add(W_block);
                             biggest_prio_among_W = copy[s][s_info[s][0]][1];
                         }
-                    }//TODO: sicherstellen, dass s_info[empty_stack][0] != -1
+                    }
                     else if (s != c_info[Relocation.prev_block][0] && s != empty_stack &&  s_info[s][1] == 0 && copy[s][s_info[s][0]][1] <= copy[empty_stack][s_info[empty_stack][0]][1]) {
                         block_in_W_found = true;
                         if (copy[s][s_info[s][0]][1] > biggest_prio_among_W) {
@@ -813,10 +814,10 @@ public class Params {
                     System.out.println("Beta increased by 0.1");
                 }
             } else {
-            System.out.println("No solution found!");
-            PreMarshalling.solution_found = false;
-            //TODO: vermerken, dass keine Lösung gefunden wurde
-            System.exit(0);
+                if (PreMarshalling.print_info) {
+                    System.out.println("No solution found!");
+                }
+                PreMarshalling.solution_found = false;
             }
         }
     }
@@ -1007,46 +1008,7 @@ public class Params {
         compute_d_c(copy, stacks, stacks_per_bay, tiers, containers, consider_time);
     }
 
-    public static int compute_params_LB(int [][][] initial_bay, int stacks, int stacks_per_bay, int tiers, int containers) {
-        compute__params_IBF(initial_bay, stacks, tiers);
-
-        int LB_F = compute__LB_F(initial_bay, stacks, tiers);
-
-        int IBF_0 = compute__IBF_0(stacks, tiers);
-
-        int IBF_1 = compute__IBF_1(IBF_0, stacks, tiers);
-
-        int IBF_2 = compute__IBF_2(LB_F, IBF_0, IBF_1, stacks, tiers);
-
-        int IBF_3 = compute__IBF_3(LB_F, IBF_2);
-
-        int IBF_4 = compute__IBF_4(initial_bay, LB_F, IBF_3, stacks);
-
-        switch (PreMarshalling.lower_bound_method) {
-            case "LB_F" -> {
-                return LB_F;
-            }
-            case "IBF_0" -> {
-                return IBF_0;
-            }
-            case "IBF_1" -> {
-                return IBF_1;
-            }
-            case "IBF_2" -> {
-                return IBF_2;
-            }
-            case "IBF_3" -> {
-                return IBF_3;
-            }
-            case "IBF_4" -> {
-                return IBF_4;
-            }
-        }
-
-        return compute__n_m(stacks, tiers);
-    }
-
-    private static int compute__IBF_4(int [][][] initial_bay, int LB_F, int IBF_3, int stacks) {
+    public static int compute__IBF_4(int [][][] initial_bay, int LB_F, int IBF_3, int stacks) {
         int IBF_4 = IBF_3;
         if (LB_F == IBF_3) {
             for (int g = 0; g < groups-1; g++) {
@@ -1067,6 +1029,7 @@ public class Params {
                                     for (int i = 0; i < n_M_s[s] - 1; i++) {
                                         if (gs <= m_i_s[i][s] && m_i_s[i][s] <= gkb) {
                                             demand_stack[s] = true;
+                                            i = n_M_s[s];
                                         }
                                     }
                                     if (gs <= w_s[s] && w_s[s] <= gkb) {
@@ -1095,14 +1058,60 @@ public class Params {
                                 boolean condition_1 = false;
                                 boolean condition_2 = false;
                                 boolean condition_3 = false;
+
                                 for (int s = 0; s < stacks; s++) {
                                     if (dirty_stacks.contains(s) && min_dirty_height > supply[s]) {
                                         condition_1 = true;
-                                    } else if (clean_supply_stacks.size() == 1 && dirty_stacks.size() == 0 && clean_demand_stacks.size() >= 1) {
-                                        //TODO: condition_2 weiter ausführen
+                                    }
+                                    if (clean_supply_stacks.size() == 1 && dirty_stacks.size() == 0 && clean_demand_stacks.contains(s)) {
+                                        //condition 2
+                                        int group_topmost_demand_container = 0;
+                                        int maximum_group_demand_containers = 0;
+                                        boolean topmost_demand_container_found = false;
+                                        for (int t = n_s[s]; t >= 0; t--) {
+                                            if (d_g[initial_bay[s][t][1]] > 0) {
+                                                if (!topmost_demand_container_found) {
+                                                    group_topmost_demand_container = initial_bay[s][t][1];
+                                                    topmost_demand_container_found = true;
+                                                }
+                                                if (initial_bay[s][t][1] > maximum_group_demand_containers) {
+                                                    maximum_group_demand_containers = initial_bay[s][t][1];
+                                                }
+                                            }
+                                        }
+                                        if (group_topmost_demand_container < maximum_group_demand_containers) {
+                                            condition_2 = true;
+                                        }
+
+                                    }
+                                    if (clean_supply_stacks.size() == 1 && dirty_stacks.contains(s)) {
+                                        //condition 3
+                                        condition_3 = true;
+                                        int maximum_group_dirty_demand_containers = 0;
+                                        int topmost_dirty_demand_containers = 0; //group
+                                        boolean topmost_dirty_demand_containers_found = false;
+                                        int topmost_non_misoverlaying_containers = 0; //group
+                                        boolean topmost_non_misoverlaying_containers_found = false;
+                                        for (int t = n_s[s]; t >= 0; t--) {
+                                            if (d_g[initial_bay[s][t][1]] > 0) {
+                                                if (!topmost_dirty_demand_containers_found) {
+                                                    topmost_dirty_demand_containers = initial_bay[s][t][1];
+                                                    topmost_dirty_demand_containers_found = true;
+                                                }
+                                                if (initial_bay[s][t][1] > maximum_group_dirty_demand_containers) {
+                                                    maximum_group_dirty_demand_containers = initial_bay[s][t][1];
+                                                }
+                                            }
+                                            if (initial_bay[s][t][2] == 1 && !topmost_non_misoverlaying_containers_found) {
+                                                topmost_non_misoverlaying_containers = initial_bay[s][t][1];
+                                                topmost_non_misoverlaying_containers_found = true;
+                                            }
+                                        }
+                                        if (maximum_group_dirty_demand_containers <= topmost_dirty_demand_containers || maximum_group_dirty_demand_containers <= topmost_non_misoverlaying_containers) {
+                                            condition_3 = false;
+                                        }
                                     }
                                 }
-                                //TODO: conditions
                                 if (condition_1 || condition_2 || condition_3) {
                                     IBF_4 += 1;
                                 }
@@ -1115,7 +1124,7 @@ public class Params {
         return IBF_4;
     }
 
-    private static void compute__params_IBF(int[][][] initial_bay, int stacks, int tiers) {
+    public static void compute__params_IBF(int[][][] initial_bay, int stacks, int tiers) {
         n_s = new int[stacks];
         n_M_s = new int[stacks];
         n_N_s  = new int[stacks];
@@ -1133,12 +1142,11 @@ public class Params {
         g_BG_si = new int[stacks][tiers];
 
         for (int s = 0; s < stacks; s++) {
-            Set<Integer> largest_misoverlaying_group_values = new TreeSet<>(); //sorts the misoverlaying group values in a stack s, so that they can be added to m_i_s afterwards
-            Set<Integer> minimum_group_values_for_repairing = new TreeSet<>();
+            List<Integer> largest_misoverlaying_group_values = new ArrayList<>(); //sorts the misoverlaying group values in a stack s, so that they can be added to m_i_s afterwards
             m_s[s] = 0;
             w_s[s] = 100000;
             boolean all_non_misoverlaying_containers_same_group = false;
-            int group_t_current = 0;
+            int group_t_current;
             int group_t_last = 0;
             boolean misoverlaid_upside_down = true;
             boolean misoverlaid_upside_down_except_one = true;
@@ -1171,7 +1179,6 @@ public class Params {
                             group_t_last = group_t_current;
                             }
                             misoverlaid_upside_down = false;
-                            minimum_group_values_for_repairing.add(group_t_current);
                         } else {
                             group_t_last = group_t_current;
                         }
@@ -1182,7 +1189,7 @@ public class Params {
                 c_top_s[s] = 0;
                 w_s[s] = groups;
             }
-            if (all_non_misoverlaying_containers_same_group && n_N_s[s] > 1) { //TODO: soll dies nur gelten, wenn mind. 2 geordnete Blöcke vorhanden sind
+            if (all_non_misoverlaying_containers_same_group && n_N_s[s] > 1) {
                 w_sec_s[s] = groups;
             }
             if (s_info[s][0] <= 0) {
@@ -1206,8 +1213,6 @@ public class Params {
                     Us.add(s);
                 }
                 if (Us.contains(s)) {
-                    //TODO: Muss BX move durchgeführt werden, oder wird g_X_s[s] auf belegt, wenn nur BG moves?
-                    //TODO: g_X_s: Wenn n_M_s[s] gleich 2 ist, welchen Block bewege ich dann auf den non-misoverlaid stack?
                     if (n_M_s[s] > 2) {
                         if (initial_bay[s][s_info[s][0]][1] > initial_bay[s][s_info[s][0] - 1][1]) {
                             g_X_s[s] = initial_bay[s][s_info[s][0]][1];
@@ -1226,10 +1231,11 @@ public class Params {
                         g_X_s[s] = initial_bay[s][s_info[s][0]][1];
                     }
                 }
-                TreeSet<Integer> largest_misoverlaying_group_values_Reverse = (TreeSet<Integer>) ((TreeSet<Integer>) largest_misoverlaying_group_values).descendingSet();
-                m_s[s] = largest_misoverlaying_group_values_Reverse.first();
-                for (Integer j: largest_misoverlaying_group_values_Reverse) {
-                    m_i_s[s][indexOf(largest_misoverlaying_group_values_Reverse, j)] = j;
+                m_s[s] = Collections.max(largest_misoverlaying_group_values);
+                int size = largest_misoverlaying_group_values.size();
+                for (int j = 0; j < size; j++) {
+                    m_i_s[s][j] = Collections.max(largest_misoverlaying_group_values);
+                    largest_misoverlaying_group_values.remove(Collections.max(largest_misoverlaying_group_values));
                 }
                 int [][] non_misoverlaid_stacks_necessary = new int [stacks][tiers-1];
                 boolean new_stack_because_not_upside_down = false;
@@ -1245,7 +1251,6 @@ public class Params {
                                 ss = stacks;
                                 new_stack_because_not_upside_down = false;
                             } else if (initial_bay[s][t][1] <= non_misoverlaid_stacks_necessary[ss][tt] && !new_stack_because_not_upside_down) {
-                                //TODO: überprüfen, dass unterhalb von Block keiner ist, der die Bedingung ebenfalls erfüllt und größer als höherer Gruppe als der Block angehört
                                 for(int ttt = t-1; ttt > 0 && initial_bay[s][ttt][2] == 0; ttt--) {
                                     if (initial_bay[s][ttt][1] <= non_misoverlaid_stacks_necessary[ss][tt] && initial_bay[s][ttt][1] > initial_bay[s][t][1]) {
                                         new_stack_because_not_upside_down = true;
@@ -1271,6 +1276,7 @@ public class Params {
                         }
                     }
                 }
+                //TODO: Achtung keine duplicates -> ArrayList verwenden!
                 Set<Integer> minimum_group_value_ith_non_misoverlaid_stack = new TreeSet<>();
                 for (int ss = 0; ss < stacks; ss++) {
                     if (non_misoverlaid_stacks_necessary[ss][0] != 0) {
@@ -1278,15 +1284,10 @@ public class Params {
                         minimum_group_value_ith_non_misoverlaid_stack.add(non_misoverlaid_stacks_necessary[ss][0]);
                     }
                 }
+                //TODO: anpassen, sodass duplicates berücksichtigt werden
                 TreeSet<Integer> minimum_group_value_ith_non_misoverlaid_stack_Reverse = (TreeSet<Integer>) ((TreeSet<Integer>) minimum_group_value_ith_non_misoverlaid_stack).descendingSet();
                 for (Integer group_value: minimum_group_value_ith_non_misoverlaid_stack_Reverse) {
                     g_BG_si[s][indexOf(minimum_group_value_ith_non_misoverlaid_stack_Reverse, group_value)] = group_value;
-                }
-
-                minimum_group_values_for_repairing.add(group_t_last); //da last nur geupdated wird, wenn der upside-down-Teil durchlaufen wird, kann über last immer der fehlende minimum group value ermittelt werden
-                TreeSet<Integer> minimum_group_values_for_repairing_Reverse = (TreeSet<Integer>) ((TreeSet<Integer>) largest_misoverlaying_group_values).descendingSet();
-                for (Integer j: minimum_group_values_for_repairing_Reverse) {
-                    m_i_s[s][indexOf(minimum_group_values_for_repairing_Reverse, j)] = j;
                 }
             } else {
                 S_N.add(s);
@@ -1303,7 +1304,7 @@ public class Params {
         return list.indexOf(element);
     }
 
-    private static int compute__IBF_3(int LB_F, int IBF_2) {
+    public static int compute__IBF_3(int LB_F, int IBF_2) {
         if (LB_F == IBF_2) { //IBF_3-Bedingung
             return LB_F + 1;
         } else {
@@ -1311,7 +1312,7 @@ public class Params {
         }
     }
 
-    private static int compute__IBF_2(int LB_F, int IBF_0, int IBF_1, int stacks, int tiers) {
+    public static int compute__IBF_2(int LB_F, int IBF_0, int IBF_1, int stacks, int tiers) {
         int IBF_2 = IBF_1;
         if (case_1 || case_2a || case_2b || case_3 || case_4) {
             if (case_1) {
@@ -1477,14 +1478,14 @@ public class Params {
         return IBF_2;
     }
 
-    private static int compute__IBF_1(int IBF_0, int stacks, int tiers) {
+    public static int compute__IBF_1(int IBF_0, int stacks, int tiers) {
         //IBF_1
         case_1 = true;
         case_2a = false;
         case_2b = false;
         case_3 = false;
         case_4 = false;
-        int stacks_ordered = S_N.size(); //TODO: kann ersetzt werden durch size(S_N)
+        int stacks_ordered = S_N.size();
         int ordered_stacks_not_full = 0;
 
         for (int s = 0; s < stacks; s++) {
@@ -1514,9 +1515,7 @@ public class Params {
         }
     }
 
-    private static int compute__IBF_0(int stacks, int tiers) {
-        //wenn alle geordneten stacks voll sind, kann wie im Fall, dass alle stacks ungeordnet sind, n_b_s_min addiert werden
-        //TODO: Cases für LB_F += 1 berechnen
+    public static int compute__IBF_0(int stacks, int tiers) {
         int IBF_0;
         boolean all_non_misoverlaid_full = false;
         for (int s: S_N) {
@@ -1532,8 +1531,8 @@ public class Params {
         return IBF_0;
     }
 
-    private static int compute__LB_F(int[][][] initial_bay, int stacks, int tiers) {
-        compute__groups(initial_bay, stacks, tiers);
+    public static int compute__LB_F(int[][][] initial_bay, int stacks, int tiers) {
+        compute__groups(initial_bay, stacks);
         compute__n_g_s(initial_bay, stacks, tiers);
         compute__d_g__d_g_cum(initial_bay, stacks, tiers);
         compute__s_p_g__s_p_g_cum(initial_bay, stacks, tiers);
@@ -1631,9 +1630,7 @@ public class Params {
         }
     }
 
-    private static void compute__groups(int[][][] initial_bay, int stacks, int tiers) {
-        //TODO: Wenn eine Gruppe nicht vorkommt, dann ist Berechnung falsch
-        //TODO: Eine Konvention festlegen: Fängt bei 0 oder 1 an, können Gruppen ausgelassen werden, usw.
+    private static void compute__groups(int[][][] initial_bay, int stacks) {
         //Gruppe fängt bei 0 an und keine Gruppen dürfen ausgelassen werden.
         groups = 0;
         for (int s = 0; s < stacks; s++) {

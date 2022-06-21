@@ -296,7 +296,6 @@ public class Relocation implements Comparable<Relocation> {
                 System.out.println("Illegal move!");
             }
             PreMarshalling.solution_found = false;
-            System.exit(0);
         }
 
         copy[next_stack][next_tier][0] = block + 1;
@@ -598,7 +597,6 @@ public class Relocation implements Comparable<Relocation> {
         } else {
             System.out.println("DEADLOCK! No next_option found.");
             PreMarshalling.solution_found = false;
-            System.exit(0);
         }
     }
 
@@ -648,42 +646,6 @@ public class Relocation implements Comparable<Relocation> {
                     }
                 }
             }
-            //warum ist die obere Methode bei 5 und 6 tiers schneller und bei 7 tiers langsamer? -> muss eig schneller sein im Schnitt
-            /*
-            for (int cc = 0; cc < next_options.length; cc++) {
-                int c = (int) next_options[cc];
-                if (h_c[c] < min_value) {
-                    next = c;
-                    min_value = h_c[c];
-                    time_from_prev = (double) Math.abs(c_info[next][0]/stacks_per_bay - c_info[prev_block][0]/stacks_per_bay) * 2 * 1.875 + (double) Math.abs(c_info[next][0] % stacks_per_bay - c_info[prev_block][0] % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - s_info[c_info[next][0]][0]) + (tiers - c_info[prev_block][1])) * 2 * 15.0;
-                    if (s_info[d_c[next]][0] != -1) {
-                        time_to_destination_stack = (double) Math.abs(c_info[next][0] / stacks_per_bay - d_c[next] / stacks_per_bay) * 2 * 1.875 + (double) Math.abs(c_info[next][0] % stacks_per_bay - d_c[next] % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - c_info[next][1]) + (tiers - (s_info[d_c[next]][0] - f_c_s[next][d_c[next]] + 1))) * 2 * 15.0;
-                    } else {
-                        time_to_destination_stack = (double) Math.abs(c_info[next][0] / stacks_per_bay - d_c[next] / stacks_per_bay) * 2 * 1.875 + (double) Math.abs(c_info[next][0] % stacks_per_bay - d_c[next] % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - c_info[next][1]) + tiers) * 2 * 15.0;
-                    }
-                } else if (consider_time && h_c[c] == min_value) {
-                    int next_option = c;
-                    double time_from_prev_option = (double) Math.abs(c_info[next_option][0]/stacks_per_bay - c_info[prev_block][0]/stacks_per_bay) * 2 * 1.875 + (double) Math.abs(c_info[next_option][0] % stacks_per_bay - c_info[prev_block][0] % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - s_info[c_info[next_option][0]][0]) + (tiers - c_info[prev_block][1])) * 2 * 15.0;
-                    double time_to_destination_stack_option;
-                    if (s_info[d_c[next_option]][0] != -1) {
-                        time_to_destination_stack_option = (double) Math.abs(c_info[next_option][0] / stacks_per_bay - d_c[next_option] / stacks_per_bay) * 2 * 1.875 + (double) Math.abs(c_info[next_option][0] % stacks_per_bay - d_c[next_option] % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - c_info[next_option][1]) + (tiers - (s_info[d_c[next_option]][0] - f_c_s[next_option][d_c[next_option]] + 1))) * 2 * 15.0;
-                    } else {
-                        time_to_destination_stack_option = (double) Math.abs(c_info[next_option][0] / stacks_per_bay - d_c[next_option] / stacks_per_bay) * 2 * 1.875 + (double) Math.abs(c_info[next_option][0] % stacks_per_bay - d_c[next_option] % stacks_per_bay) * 2 * 2.4 + (double) ((tiers - c_info[next_option][1]) + tiers) * 2 * 15.0;
-                    }
-                    if (time_to_destination_stack_option < time_to_destination_stack) {
-                        time_to_destination_stack = time_to_destination_stack_option;
-                        time_from_prev = time_from_prev_option;
-                        min_value = h_c[c];
-                        next = c;
-                    } else if (time_to_destination_stack_option == time_to_destination_stack && time_from_prev_option < time_from_prev) {
-                        time_from_prev = time_from_prev_option;
-                        min_value = h_c[c];
-                        next = c;
-                    }
-                }
-            }
-
-             */
         } else {
             next = 0;
         }
