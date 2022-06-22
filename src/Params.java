@@ -34,6 +34,7 @@ public class Params {
     //LB
     static int n_bx;
     static int n_gx;
+    static int n_s_gx;
     //sets
     static Set<Integer> S_M = new HashSet<>(); //Set of misoverlaid stacks.
     static Set<Integer> S_minM = new HashSet<>(); //Set of misoverlaid stacks with the minimum number of misoverlaying contaienrs.
@@ -46,7 +47,7 @@ public class Params {
     static int [] n_b_s; //number of badly placed items in stack s
     static int n_b_s_min;
     static int [][] n_g_s; //number of well placed items of all groups gs < g in stack s
-    static int [] d_g; //number of ll badly placed items of group g / demand of group g
+    static int [] d_g; //number of all badly placed items of group g / demand of group g
     static int [] d_g_cum; //cumulative demand of group g
     static int [] s_p_g; //number of all potential supply slots of group g / potential supply of group g
     static int [] s_p_g_cum; //cumulative potential supply of group g
@@ -1276,18 +1277,17 @@ public class Params {
                         }
                     }
                 }
-                //TODO: Achtung keine duplicates -> ArrayList verwenden!
-                Set<Integer> minimum_group_value_ith_non_misoverlaid_stack = new TreeSet<>();
+                List<Integer> minimum_group_value_ith_non_misoverlaid_stack = new ArrayList<>();
                 for (int ss = 0; ss < stacks; ss++) {
                     if (non_misoverlaid_stacks_necessary[ss][0] != 0) {
                         n_BG_s[s] += 1;
                         minimum_group_value_ith_non_misoverlaid_stack.add(non_misoverlaid_stacks_necessary[ss][0]);
                     }
                 }
-                //TODO: anpassen, sodass duplicates berücksichtigt werden
-                TreeSet<Integer> minimum_group_value_ith_non_misoverlaid_stack_Reverse = (TreeSet<Integer>) ((TreeSet<Integer>) minimum_group_value_ith_non_misoverlaid_stack).descendingSet();
-                for (Integer group_value: minimum_group_value_ith_non_misoverlaid_stack_Reverse) {
-                    g_BG_si[s][indexOf(minimum_group_value_ith_non_misoverlaid_stack_Reverse, group_value)] = group_value;
+                size = minimum_group_value_ith_non_misoverlaid_stack.size();
+                for (int j = 0; j < size; j++) {
+                    g_BG_si[s][j] = Collections.max(minimum_group_value_ith_non_misoverlaid_stack);
+                    minimum_group_value_ith_non_misoverlaid_stack.remove(Collections.max(minimum_group_value_ith_non_misoverlaid_stack));
                 }
             } else {
                 S_N.add(s);
@@ -1304,9 +1304,87 @@ public class Params {
         return list.indexOf(element);
     }
 
-    public static int compute__IBF_3(int LB_F, int IBF_2) {
-        if (LB_F == IBF_2) { //IBF_3-Bedingung
-            return LB_F + 1;
+    public static int compute__IBF_3(int [][][] initial_bay, int LB_F, int IBF_2, int stacks, int tiers) {
+        if (LB_F == IBF_2 && n_gx > 0) { //IBF_3-Bedingung
+            //es werden n_s_gx dummy stacks hinzugefügt, um zu prüfen, ob diese und die vorhandenen s in s_N ausreichen, um die misoverlaid stacks zu repairen
+            //falls dies nicht möglich, wird eine weitere Umlagerung benötigt
+
+            //Hilfsarray, um bei Umlagerungen oberste Gruppe in stack festzuhalten
+            int [] g_top_s_help = new int [stacks + n_s_gx];
+            for (int s = 0; s < g_top_s_help.length; s++) {
+                if (s < stacks) {
+                    g_top_s_help[s] = g_top_s[s];
+                } else {
+                    g_top_s_help[s] = groups;
+                }
+            }
+            //Hilfsarray, um bei Umlagerungen Anzahl der ungeordneten Blöcke in stack festzuhalten
+            int [] n_M_s_help = new int [stacks];
+            for (int s: S_M) {
+                n_M_s_help[s] = n_M_s[s];
+            }
+            //Hilfsarray, um bei Umlagerungen Anzahl der Blöcke in stack festzuhalten
+            int [] n_s_help = new int [stacks + n_s_gx];
+            for (int s = 0; s < n_s_help.length; s++) {
+                if (s < stacks) {
+                    n_s_help[s] = n_s[s];
+                } else {
+                    n_s_help[s] = 0;
+                }
+            }
+            int blocks_still_misoverlaid_count = n_M;
+            Set <Integer> stacks_still_misoverlaid = new HashSet<>(S_M);
+            Set <Integer> stacks_not_misoverlaid = new HashSet<>(S_N);
+            //dummy stacks zu geordneten stacks hinzugefügt
+            for (int s = stacks; s < stacks + n_s_gx; s++) {
+                stacks_not_misoverlaid.add(s);
+            }
+            boolean no_additional_relocation_needed = true;
+            while (blocks_still_misoverlaid_count > 0 && no_additional_relocation_needed) {
+                //größter group value unter allen topmost blocks in nicht geordneten stacks
+                int[] biggest_group_value_and_stack_misoverlaid_top = new int[2]; //value, stack
+                for (int s: stacks_still_misoverlaid) {
+                    if (g_top_s_help[s] > biggest_group_value_and_stack_misoverlaid_top[0]) {
+                        biggest_group_value_and_stack_misoverlaid_top[0] = g_top_s_help[s];
+                        biggest_group_value_and_stack_misoverlaid_top[1] = s;
+                    }
+                }
+                //den Block mit dem größten group value aller topmost blocks umlagern auf Block in S_N mit kleinstmöglicher Gruppendifferenz
+                //wenn kein Stack bzw. Block gefunden wird, dann wird eine weitere Umlagerung benötigt (LB_F += 1)
+                int destination_stack = 0;
+                boolean destination_stack_found = false;
+                int difference_group_values = 1000000;
+                for (int s: stacks_not_misoverlaid) {
+                    if (n_s_help[s] < tiers && biggest_group_value_and_stack_misoverlaid_top[0] < g_top_s_help[s] && (g_top_s_help[s] - biggest_group_value_and_stack_misoverlaid_top[0]) < difference_group_values) {
+                        destination_stack = s;
+                        destination_stack_found = true;
+                        difference_group_values = g_top_s_help[s] - biggest_group_value_and_stack_misoverlaid_top[0];
+                    }
+                }
+                if (destination_stack_found) {
+                    int source_stack = biggest_group_value_and_stack_misoverlaid_top[1];
+                    int source_group = biggest_group_value_and_stack_misoverlaid_top[0];
+                    //Updates durchführen
+                    n_M_s_help[source_stack]--;
+                    n_s_help[source_stack]--;
+                    n_s_help[destination_stack]++;
+                    g_top_s_help[destination_stack] = source_group;
+                    g_top_s_help[source_stack] = initial_bay[source_stack][n_s_help[source_stack] - 1][1];
+                    if (initial_bay[source_stack][n_s_help[source_stack] - 1][2] == 1) {
+                        stacks_still_misoverlaid.remove(source_stack);
+                        stacks_not_misoverlaid.add(source_stack);
+                    }
+                    blocks_still_misoverlaid_count--;
+                } else {
+                    //wenn ungeordnete stacks nicht repaired werden können
+                    no_additional_relocation_needed = false;
+                }
+            }
+            if (!no_additional_relocation_needed) {
+                return LB_F + 1;
+            } else {
+                return IBF_2;
+            }
         } else {
             return IBF_2;
         }
@@ -1548,8 +1626,13 @@ public class Params {
             n_bx = n_M;
         }
 
-        int n_s_gx = Math.max(0, d_s_g_cum_max[0] / tiers);
-        //stacks werden nach n_g_s aufsteigend sortiert , um dann die n_g_s in den ersten n_s_gx stacks aufzusummieren
+        //TODO: muss n_s_gx += 1 bei d_s_g_cum_max[0] / tiers Rest besteht?
+        n_s_gx = Math.max(0, d_s_g_cum_max[0] / tiers);
+        //TODO: an Beispielen überprüfen
+        if (d_s_g_cum_max[0] % tiers > 0) {
+            n_s_gx += 1;
+        }
+        //stacks werden nach n_g_s aufsteigend sortiert, um dann die n_g_s in den ersten n_s_gx stacks aufzusummieren
         n_gx = 0; //Summe n_g_s über die ersten n_s_gx stacks nach Sortierung
         int [] stacks_checked = new int [stacks];
         for (int i = 0; i < n_s_gx; i++) {
@@ -1573,7 +1656,8 @@ public class Params {
         d_s_g_cum_max = new int [2];
         for (int g = 0; g < groups; g++) {
             d_s_g_cum[g] = d_g_cum[g] - s_p_g_cum[g];
-            if (d_s_g_cum[g] > d_s_g_cum_max[0]) {
+            //hier >=, damit bei Gleichstand, die größere Gruppe gewählt wird, da so n_gx richtig bestimmt wird
+            if (d_s_g_cum[g] >= d_s_g_cum_max[0]) {
                 d_s_g_cum_max[0] = d_s_g_cum[g];
                 d_s_g_cum_max[1] = g;
             }

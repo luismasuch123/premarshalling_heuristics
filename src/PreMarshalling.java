@@ -45,7 +45,7 @@ public class PreMarshalling {
     static double speed_loading_unloading = 20;
 
     public static void main (String [] args) throws FileNotFoundException {
-        String initial_bay_path = "/Users/luismasuchibanez/IdeaProjects/premarshalling_heuristics/data/Test/test.bay";
+        String initial_bay_path = "/Users/luismasuchibanez/IdeaProjects/premarshalling_heuristics/data/Test/minimal_bay.bay";
         consider_time = true;
         multiple_bays = true;
         print_info = false;
@@ -169,7 +169,8 @@ public class PreMarshalling {
 
         int IBF_2 = Params.compute__IBF_2(LB_F, IBF_0, IBF_1, stacks, tiers);
 
-        int IBF_3 = Params.compute__IBF_3(LB_F, IBF_2);
+        //TODO: case für IBF_3 untersuchen
+        int IBF_3 = Params.compute__IBF_3(initial_bay, LB_F, IBF_2, stacks, tiers);
 
         int IBF_4 = Params.compute__IBF_4(initial_bay, LB_F, IBF_3, stacks);
 
