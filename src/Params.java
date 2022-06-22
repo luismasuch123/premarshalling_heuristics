@@ -74,6 +74,11 @@ public class Params {
     static int [] g_X_s; //Minimum top group value of the non-misoverlaid stack necessary for repairing stack s in Us with BG moves to the stack and one BX move to another stack.
     static int [] n_BG_s; //Minimum number of non-misoverlaid stacks necessary for repairing stack s with only BG moves.
     static int [][] g_BG_si; //Minimum group value of the topmost conatainer of the ith non-misoverlaid stack for repairing stack s.
+    //time
+    static int lower_bound_moves; //LB Umlagerungen
+    static double lower_bound_time; //LB benötigte Zeit für Umlagerungen
+    static double t_min; //minimale Zeit, die für eine Umlagerung benötigt werden kann
+    static int [][] highest_tier_to_move_blocking_containers_to;
 
     public static void check_sorted_pre(int [][][] initial_bay, int stacks, int tiers) {
         sorted = true;
@@ -1628,7 +1633,6 @@ public class Params {
 
         //TODO: muss n_s_gx += 1 bei d_s_g_cum_max[0] / tiers Rest besteht?
         n_s_gx = Math.max(0, d_s_g_cum_max[0] / tiers);
-        //TODO: an Beispielen überprüfen
         if (d_s_g_cum_max[0] % tiers > 0) {
             n_s_gx += 1;
         }
@@ -1738,5 +1742,50 @@ public class Params {
                 }
             }
         }
+    }
+
+    public static void compute__params_LB_time(boolean multiple_bays, int stacks, int tiers) {
+        if (multiple_bays) {
+            t_min = 2 * PreMarshalling.speed_bays + 4 * PreMarshalling.speed_tiers;
+        } else {
+            t_min = 2 * PreMarshalling.speed_stacks + 4 * PreMarshalling.speed_tiers;
+        }
+        highest_tier_to_move_blocking_containers_to = new int [stacks][];
+        for (int s = 0; s < stacks; s++) {
+            if (Params.S_M.contains(s)) {
+                highest_tier_to_move_blocking_containers_to[s] = new int[Params.n_M_s[s]];
+                List<Integer> highest_tiers_to_move_blocking_containers_to = new ArrayList<>();
+                for (int i = 0; i < Params.n_M_s[s]; i++) {
+                    for (int ss = 0; ss < stacks; ss++) {
+                        if (s != ss) {
+                            if (Params.n_N_s[ss] + i <= tiers) {
+                                highest_tiers_to_move_blocking_containers_to.add(Params.n_N_s[ss] + i + 1);
+                            }
+                        }
+                    }
+                }
+                for (int i = 0; i < Params.n_M_s[s]; i++) {
+                    highest_tier_to_move_blocking_containers_to[s][i] = Collections.max(highest_tiers_to_move_blocking_containers_to);
+                    highest_tiers_to_move_blocking_containers_to.remove(Collections.max(highest_tiers_to_move_blocking_containers_to));
+                }
+            }
+        }
+    }
+
+    public static double compute__LB_time(boolean multiple_bays, int stacks, int tiers) {
+        //Zeit, die mindestens aufgebracht werden muss, um Blöcke, die bereits geordnet sind umzulagern
+        lower_bound_time += (lower_bound_moves - n_M) * (t_min + 2 * PreMarshalling.speed_loading_unloading);
+        for (int s = 0; s < stacks; s++) {
+            for (int t = n_s[s]; t > n_N_s[s]; t--) {
+                //Zeit, die mindestens aufgebracht werden muss, um ungeordneten Block umzulagern
+                //TODO: theoretisch könnte von jedem ungeordneten Block aus, die Zeit zum nächst möglichen Umlagerplatz aufsummiert werden
+                if (multiple_bays) {
+                    lower_bound_time += 2 * PreMarshalling.speed_bays + (tiers - t + 1) * PreMarshalling.speed_tiers + (tiers - highest_tier_to_move_blocking_containers_to[s][Params.n_s[s] - t] + 1) + 2 * PreMarshalling.speed_loading_unloading;
+                } else {
+                    lower_bound_time += 2 * PreMarshalling.speed_stacks + (tiers - t + 1) * PreMarshalling.speed_tiers + (tiers - highest_tier_to_move_blocking_containers_to[s][Params.n_s[s] - t] + 1) + 2 * PreMarshalling.speed_loading_unloading;
+                }
+            }
+        }
+        return lower_bound_time / 3600;
     }
 }
