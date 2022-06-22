@@ -41,7 +41,7 @@ public class PreMarshalling {
     static double speed_loading_unloading = 20; //Dauer Lastaufnahme/-abgabe
 
     public static void main (String [] args) throws FileNotFoundException {
-        String initial_bay_path = "/Users/luismasuchibanez/IdeaProjects/premarshalling_heuristics/data/Test/minimal_bay.bay";
+        String initial_bay_path = "/Users/luismasuchibanez/IdeaProjects/premarshalling_heuristics/data/Test/emm_s10_t4_p1_c0_16.bay";
         consider_time = true;
         multiple_bays = true;
         print_info = false;
@@ -50,7 +50,7 @@ public class PreMarshalling {
 
         //Huang
         correction = true;
-        Params.beta = 0.2; //scheint am besten zu sein wenn beta_h <= 1
+        Relocation_Huang.beta = 0.2; //scheint am besten zu sein wenn beta_h <= 1
 
             try {
                 BayInstance instance = BayInstance.get_initial_bay(initial_bay_path, multiple_bays);
@@ -97,8 +97,8 @@ public class PreMarshalling {
         if (method.equals("Jovanovic") || method.equals("Huang")) {
             int[][][] final_bay = new int[stacks][tiers][3];
             if (method.equals("Jovanovic")) {
-                final_bay = (int[][][]) premarshall_Jovanovic(initial_bay, stacks, stacks_per_bay, tiers, containers, Relocation.order_relocations, Relocation.same_stack_under, Relocation.same_stack_below)[0];
-                solution_found = (boolean) premarshall_Jovanovic(initial_bay, stacks, stacks_per_bay, tiers, containers, Relocation.order_relocations, Relocation.same_stack_under, Relocation.same_stack_below)[1];
+                final_bay = (int[][][]) premarshall_Jovanovic(initial_bay, stacks, stacks_per_bay, tiers, containers, Relocation_Jovanovic.order_relocations, Relocation_Jovanovic.same_stack_under, Relocation_Jovanovic.same_stack_below)[0];
+                solution_found = (boolean) premarshall_Jovanovic(initial_bay, stacks, stacks_per_bay, tiers, containers, Relocation_Jovanovic.order_relocations, Relocation_Jovanovic.same_stack_under, Relocation_Jovanovic.same_stack_below)[1];
             } else if (method.equals("Huang")) {
                 final_bay = (int[][][]) premarshall_Huang(initial_bay, stacks, stacks_per_bay, tiers, containers)[0];
                 solution_found = (boolean) premarshall_Huang(initial_bay, stacks, stacks_per_bay, tiers, containers)[1];
@@ -116,8 +116,8 @@ public class PreMarshalling {
                 System.out.println("Distance_total in blocks: " + Arrays.toString(Relocation.distance_total));
                 System.out.println("Time_relocations in h: " + time_relocations);
                 System.out.println("Time_total in h: " + time_total);
-                if (Relocation.deadlock_count > 0) {
-                    System.out.println("Deadlocks: " + Relocation.deadlock_count);
+                if (Relocation_Jovanovic.deadlock_count > 0) {
+                    System.out.println("Deadlocks: " + Relocation_Jovanovic.deadlock_count);
                 }
                 System.out.println("True number relocations: " + relocations.size());
                 System.out.println("Solution found: " + solution_found);
@@ -128,10 +128,10 @@ public class PreMarshalling {
                 }
             }
         } else if (method.equals("LB")) {
-            Params.lower_bound_moves = compute_LB_moves(initial_bay, stacks, tiers, containers);
-            Params.lower_bound_time = compute_LB_time(stacks, tiers);
-            System.out.println("LB moves: " + Params.lower_bound_moves);
-            System.out.println("LB time in h: " + Params.lower_bound_time);
+            Params_LB.lower_bound_moves = compute_LB_moves(initial_bay, stacks, tiers, containers);
+            Params_LB.lower_bound_time = compute_LB_time(stacks, tiers);
+            System.out.println("LB moves: " + Params_LB.lower_bound_moves);
+            System.out.println("LB time in h: " + Params_LB.lower_bound_time);
         }
     }
 
@@ -146,7 +146,7 @@ public class PreMarshalling {
         Relocation.relocations_count = 0;
         Relocation.distance_relocations = new int [3];
         Relocation.distance_total = new int [3];
-        Relocation.deadlock_count = 0;
+        Relocation_Jovanovic.deadlock_count = 0;
     }
 
     private static int compute_LB_moves(int [][][] initial_bay, int stacks, int tiers, int containers) {
@@ -155,19 +155,19 @@ public class PreMarshalling {
         Params.compute__c_info__s_info(initial_bay, stacks, tiers);
         Params.check_sorted(stacks);
 
-        Params.compute__params_IBF(initial_bay, stacks, tiers);
+        Params_LB.compute__params_IBF(initial_bay, Params.s_info, stacks, tiers);
 
-        int LB_F = Params.compute__LB_F(initial_bay, stacks, tiers);
+        int LB_F = Params_LB.compute__LB_F(initial_bay, Params.s_info, stacks, tiers);
 
-        int IBF_0 = Params.compute__IBF_0(stacks, tiers);
+        int IBF_0 = Params_LB.compute__IBF_0(stacks, tiers);
 
-        int IBF_1 = Params.compute__IBF_1(IBF_0, stacks, tiers);
+        int IBF_1 = Params_LB.compute__IBF_1(IBF_0, stacks, tiers);
 
-        int IBF_2 = Params.compute__IBF_2(LB_F, IBF_0, IBF_1, stacks, tiers);
+        int IBF_2 = Params_LB.compute__IBF_2(LB_F, IBF_0, IBF_1, stacks, tiers);
 
-        int IBF_3 = Params.compute__IBF_3(initial_bay, LB_F, IBF_2, stacks, tiers);
+        int IBF_3 = Params_LB.compute__IBF_3(initial_bay, LB_F, IBF_2, stacks, tiers);
 
-        int IBF_4 = Params.compute__IBF_4(initial_bay, LB_F, IBF_3, stacks);
+        int IBF_4 = Params_LB.compute__IBF_4(initial_bay, LB_F, IBF_3, stacks);
 
         switch (lower_bound_method) {
             case "LB_F" -> {
@@ -193,9 +193,9 @@ public class PreMarshalling {
     }
 
     public static double compute_LB_time(int stacks, int tiers) {
-        Params.compute__params_LB_time(multiple_bays, stacks, tiers);
+        Params_LB.compute__params_LB_time(multiple_bays, stacks, tiers);
 
-        return Params.compute__LB_time(multiple_bays, stacks, tiers);
+        return Params_LB.compute__LB_time(multiple_bays, stacks, tiers);
     }
 
     private static Object[] premarshall_Huang(int[][][] initial_bay, int stacks, int stacks_per_bay, int tiers, int containers) {
@@ -221,7 +221,7 @@ public class PreMarshalling {
             Params.compute__c_info__s_info(copy, stacks, tiers);
 
             //complete the high R stacks (Stacks, die geordnet sind und deren Höhe mindestens beta * h ist
-            Params.complete_high_R_stacks(copy, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
+            Relocation_Huang.complete_high_R_stacks(copy, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
             current_bay = BayInstance.copy_bay(Relocation.copy, current_bay, stacks, tiers);
             Params.check_sorted(stacks);
 
@@ -229,24 +229,24 @@ public class PreMarshalling {
 
             //complete the low R stacks
             if (!Params.sorted) {
-                Params.complete_low_R_stacks(copy, current_bay, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
+                Relocation_Huang.complete_low_R_stacks(copy, current_bay, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
             }
             Params.check_sorted(stacks);
 
             //deconstruct the low R stacks
             if (!Params.sorted) {
-                Params.deconstruct_low_R_stacks(copy, current_bay, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
+                Relocation_Huang.deconstruct_low_R_stacks(copy, current_bay, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
             }
             Params.check_sorted(stacks);
 
             if (!Params.sorted) {
-                Params.move_W_to_empty_stack(copy, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
+                Relocation_Huang.move_W_to_empty_stack(copy, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
             }
 
             //wenn alle R stacks voll sind und sonst nur W stacks existieren, dann kleinsten W stack zu empty stack machen
             //dieser Schritt fehlt im Paper bzw. kann es ohne diesen Schritt zu unendlichen Loops kommen, indem immer wieder dieselben Schritte durchgeführt werden
             if (relocation_count_current == Relocation.relocations_count) {
-                Params.create_empty_stack(copy, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
+                Relocation_Huang.create_empty_stack(copy, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
             }
             Params.check_sorted(stacks);
 
@@ -278,8 +278,8 @@ public class PreMarshalling {
 
         Relocation.copy = new int[stacks][tiers][3]; //Kopie, damit current_bay nicht verändert wird, falls Schritt rückgängig gemacht werden muss nach look-ahead
 
-        Relocation.deadlock = false;
-        Relocation.deadlock_next = new int[containers];
+        Relocation_Jovanovic.deadlock = false;
+        Relocation_Jovanovic.deadlock_next = new int[containers];
         while(!Params.sorted && solution_found) {
             relocations_on_hold = new TreeSet<>();
             step++;
@@ -291,20 +291,20 @@ public class PreMarshalling {
             Relocation.copy = BayInstance.copy_bay(current_bay, Relocation.copy, stacks, tiers);
             int [][][] copy = Relocation.copy;
 
-            Params.compute_params_Jovanovic(copy, stacks, stacks_per_bay, tiers, containers, consider_time);
+            Params_Jovanovic.compute_params_Jovanovic(copy, stacks, stacks_per_bay, tiers, containers, consider_time);
 
-            Relocation.get_next_Jovanovic(Params.c_info, Params.s_info, Params.d_c, Params.w_c_s, Params.f_c_s, next_selection, consider_time, containers, tiers, stacks_per_bay);
+            Relocation_Jovanovic.get_next_Jovanovic(copy, Relocation.next_block, Relocation.prev_block, Params.c_info, Params.s_info, Params_Jovanovic.d_c, Params_Jovanovic.w_c_s, Params_Jovanovic.f_c_s, next_selection, consider_time, containers, tiers, stacks_per_bay);
             int next = Relocation.next_block;
             if (print_info) {
-                System.out.println("next: " + next + " from stack " + Params.c_info[next][0] + " to stack " + Params.d_c[next]);
+                System.out.println("next: " + next + " from stack " + Params.c_info[next][0] + " to stack " + Params_Jovanovic.d_c[next]);
             }
 
-            Relocation.same_stack = false;
-            Relocation.same_stack_over = false;
-            Relocation.same_stack_under = false;
-            Relocation.next_to_stopover_stack_prevent_deadlock = false;
+            Relocation_Jovanovic.same_stack = false;
+            Relocation_Jovanovic.same_stack_over = false;
+            Relocation_Jovanovic.same_stack_under = false;
+            Relocation_Jovanovic.next_to_stopover_stack_prevent_deadlock = false;
 
-            Relocation.compute__order_relocations__same_stack_below_Jovanovic(Params.c_info, Params.s_info, Params.d_c, Params.g_c_s, Params.f_c_s, next);
+            Relocation_Jovanovic.compute__order_relocations__same_stack_below_Jovanovic(copy, Params.c_info, Params.s_info, Params_Jovanovic.d_c, Params_Jovanovic.g_c_s, Params_Jovanovic.f_c_s, next);
             if (print_info) {
                 System.out.println("order_relocations: " + Arrays.toString(order_relocations));
                 if (same_stack_under) {
@@ -313,27 +313,27 @@ public class PreMarshalling {
             }
 
             //die Blöcke umlagern, die next blockieren (egal welcher stack) oder next's Platz im destination stack blockieren (wenn stack gleich destination stack)
-            Relocation.relocate_blocking_blocks_Jovanovic(Params.c_info, Params.s_info, Params.d_c, stack_selection, consider_time, multiple_bays, stacks, stacks_per_bay, tiers);
+            Relocation_Jovanovic.relocate_blocking_blocks_Jovanovic(copy, Relocation.next_block, Params.c_info, Params.s_info, Params_Jovanovic.d_c, stack_selection, consider_time, multiple_bays, stacks, stacks_per_bay, tiers);
 
             //next umlagern
-            if (!Relocation.deadlock) {
-                Relocation.deadlock_next = new int[containers];
-                Relocation.relocate_next_Jovanovic(Params.c_info, Params.s_info, Params.d_c, stack_selection, consider_time, multiple_bays, stacks, tiers, stacks_per_bay);
+            if (!Relocation_Jovanovic.deadlock) {
+                Relocation_Jovanovic.deadlock_next = new int[containers];
+                Relocation_Jovanovic.relocate_next_Jovanovic(copy, Relocation.next_block, Params.c_info, Params.s_info, Params_Jovanovic.d_c, stack_selection, consider_time, multiple_bays, stacks, tiers, stacks_per_bay);
             } else {
-                Relocation.deadlock_next[next] = next+1;
+                Relocation_Jovanovic.deadlock_next[next] = next+1;
                 if (print_info) {
                     System.out.println("DEADLOCK!");
-                    System.out.println("deadlock_next: " + Arrays.toString(Relocation.deadlock_next));
+                    System.out.println("deadlock_next: " + Arrays.toString(Relocation_Jovanovic.deadlock_next));
                 }
-                Relocation.deadlock_count++;
+                Relocation_Jovanovic.deadlock_count++;
                 Relocation.copy = BayInstance.copy_bay(current_bay, copy, stacks, tiers);
                 relocations_on_hold.clear();
                 //TODO: Relocation.relocations_count = relocations.size();
             }
 
             //filling
-            if (!Relocation.deadlock) {
-                Relocation.stack_filling_Jovanovic(Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, stack_filling, multiple_bays, consider_time);
+            if (!Relocation_Jovanovic.deadlock) {
+                Relocation_Jovanovic.stack_filling_Jovanovic(copy, Relocation.next_block, Relocation.prev_block, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, stack_filling, multiple_bays, consider_time);
                 relocations.addAll(relocations_on_hold);
 
             }
