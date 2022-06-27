@@ -3,7 +3,7 @@ import java.util.*;
 
 public class PreMarshalling {
 
-    static String [] method = {"Jovanovic", "Huang", "LB"};
+    static String [] method = {"Jovanovic", "Huang", "LB"}; //Jovanovic entspricht Multi-Heuristik und Huang Typ-A-Algorithmus
     static boolean consider_time; //soll Zeit bei Stack- bzw. Blockauswahl berücksichtigt werden
     static boolean multiple_bays; //sollen alle bays gleichzeitig berücksichtigt oder nacheinander premarshalled werden
     static boolean print_info; //sollen informationen zu einzelnen Umlagerungen und dem aktuellen Stand der bay ausgegeben werden
@@ -13,14 +13,14 @@ public class PreMarshalling {
     static int [][][] current_bay; //aktueller Stand der bay
 
     static TreeSet<Relocation> relocations; //relocation_count, block, prev_stack, next_stack, prev_tier, next_tier
-    static TreeSet<Relocation> relocations_on_hold; //Umlagerungen, die noch aufgehoben/rückgängig gemacht werden könnten
+    static TreeSet<Relocation> relocations_on_hold; //Umlagerungen auf Vorbehalt, falls sie wieder rückgängig gemacht werden müssen
 
     static int step; //Algorithmus-Schritt
     static int relocation_count_current;
     static double time_relocations; //keine Leerfahrten berücksichtigt, ohne Lastaufnahme und -abgabe
     static double time_total; //ohne Lastaufnahme und -abgabe
 
-    static boolean solution_found = true;
+    static boolean solution_found = true; //falls abgebrochen werden soll, da eine unzulässige Umlagerung durchgeführt wurde oder keine Lösung gefunden werden kann, wird solution_found false gesetzt
 
     //Jovanovic
     static String next_selection = "function h_c"; //"highest due date value"
@@ -31,7 +31,7 @@ public class PreMarshalling {
     static boolean correction; //soll die gefundene Lösung optimiert werden, indem überflüssige Umlagerungen, wie bei Jovanovic, gelöscht werden
 
     //LB
-    static String lower_bound_method = "IBF_3"; //"LB_F", "IBF_0", "IBF_1", "IBF_2", "IBF_3", "IBF_4"
+    static String lower_bound_method = "IBF_3"; //"LB_F", "IBF_0", "IBF_1", "IBF_2", "IBF_3", "IBF_4" //IBF_3 ist die beste Bound, die funktioniert
 
     //speed in sec/m
     static double speed_tiers = 15; //Dauer Bewegung zwischen Ebenen
@@ -41,7 +41,7 @@ public class PreMarshalling {
     static double speed_loading_unloading = 20; //Dauer Lastaufnahme/-abgabe
 
     public static void main (String [] args) throws FileNotFoundException {
-        String initial_bay_path = "/Users/luismasuchibanez/IdeaProjects/premarshalling_heuristics/data/Test/emm_s10_t4_p1_c0_16.bay";
+        String initial_bay_path = "/Users/luismasuchibanez/IdeaProjects/premarshalling_heuristics/data/Test/minimal_bay.bay";
         consider_time = true;
         multiple_bays = true;
         print_info = false;
@@ -49,12 +49,14 @@ public class PreMarshalling {
         print_relocations = false;
 
         //Huang
-        correction = true;
-        Relocation_Huang.beta = 0.2; //scheint am besten zu sein wenn beta_h <= 1
+        correction = true; //bestimmt, ob für Huang eine correction durchgeführt werden soll (eigentlich nicht vorgesehen, aber zwecks Vergleichbarkeit der Algorithmen bereitgestellt)
+        Relocation_Huang.beta = 0.2; //scheint am besten zu sein wenn beta_h ≤ 1
 
             try {
+                //Anfangskonfiguration wird aus Instanz gewonnen
                 BayInstance instance = BayInstance.get_initial_bay(initial_bay_path, multiple_bays);
                 for (String m: method) {
+                    //nach jeder Methode werden Statistiken zurückgesetzt
                     reset_statistics();
                     System.out.println("\n" + m.toUpperCase() + "\n");
                     if (multiple_bays) {
@@ -64,6 +66,7 @@ public class PreMarshalling {
                         int tiers = instance.tiers;
                         int containers = instance.containers;
 
+                        //aktuelle Methode gestartet
                         run_methods(instance, m, initial_bay, stacks, stacks_per_bay, tiers, containers);
 
                     } else {
@@ -76,6 +79,7 @@ public class PreMarshalling {
                             int containers = instance.containers_per_bay[b];
                             int[][][] initial_bay = instance.initial_bays[b];
 
+                            //aktuelle Methode gestartet
                             run_methods(instance, m, initial_bay, stacks, stacks_per_bay, tiers, containers);
                         }
                     }
@@ -92,6 +96,7 @@ public class PreMarshalling {
         if (print_info) {
             System.out.println("Initial bay: " + Arrays.deepToString(instance.initial_bay));
         }
+        //überprüfen, ob bay bereits geordnet ist
         Params.check_sorted_pre(initial_bay, stacks, tiers);
 
         if (method.equals("Jovanovic") || method.equals("Huang")) {
@@ -104,6 +109,7 @@ public class PreMarshalling {
                 solution_found = (boolean) premarshall_Huang(initial_bay, stacks, stacks_per_bay, tiers, containers)[1];
             }
 
+            //Zeiten, die für die Umlagerungen, sowie für die zusätzlichen Bewegungen benötigt werden, werden aus den zurückgelegten Distanzen abgeleitet
             time_relocations = (((double) Relocation.distance_relocations[0] * 2 * speed_tiers) + ((double) Relocation.distance_relocations[1] * 2 * speed_stacks) + ((double) Relocation.distance_relocations[2] * 2 * speed_bays)) / 3600;
             time_total = (((double) Relocation.distance_total[0] * 2 * speed_tiers) + ((double) Relocation.distance_total[1] * 2 * speed_stacks) + ((double) Relocation.distance_total[2] * 2 * speed_bays) + Relocation.relocations_count * 2 * speed_loading_unloading) / 3600;
 
@@ -128,6 +134,7 @@ public class PreMarshalling {
                 }
             }
         } else if (method.equals("LB")) {
+            //LB für Anzahl der Umlagerungen und benötigte Zeit bestimmt
             Params_LB.lower_bound_moves = compute_LB_moves(initial_bay, stacks, tiers, containers);
             Params_LB.lower_bound_time = compute_LB_time(stacks, tiers);
             System.out.println("LB moves: " + Params_LB.lower_bound_moves);
@@ -136,6 +143,7 @@ public class PreMarshalling {
     }
 
     private static void reset_statistics() {
+        //Statistiken zurücksetzen
         step = 0;
         relocations = new TreeSet<>();
         relocation_count_current = 0;
@@ -150,11 +158,13 @@ public class PreMarshalling {
     }
 
     private static int compute_LB_moves(int [][][] initial_bay, int stacks, int tiers, int containers) {
+        //c_info und s_info der Ausgangskonfiguration bestimmt, sowie überprüft, ob bay bereits geordnet ist
         Params.s_info = new int [stacks][2];
         Params.c_info = new int[containers][4];
         Params.compute__c_info__s_info(initial_bay, stacks, tiers);
         Params.check_sorted(stacks);
 
+        //benötigte Parameter für die Bound-Bestimmung der Umlagerungen und verschiedene Bounds berechnet
         Params_LB.compute__params_IBF(initial_bay, Params.s_info, stacks, tiers);
 
         int LB_F = Params_LB.compute__LB_F(initial_bay, Params.s_info, stacks, tiers);
@@ -193,6 +203,7 @@ public class PreMarshalling {
     }
 
     public static double compute_LB_time(int stacks, int tiers) {
+        //benötigte Parameter für die Bound-Bestimmung der Zeit und die Bound berechnet
         Params_LB.compute__params_LB_time(multiple_bays, stacks, tiers);
 
         return Params_LB.compute__LB_time(multiple_bays, stacks, tiers);
@@ -200,46 +211,48 @@ public class PreMarshalling {
 
     private static Object[] premarshall_Huang(int[][][] initial_bay, int stacks, int stacks_per_bay, int tiers, int containers) {
         current_bay = new int[stacks][tiers][3];
-        current_bay = BayInstance.copy_bay(initial_bay, current_bay, stacks, tiers);
+        current_bay = BayInstance.copy_bay(initial_bay, current_bay, stacks, tiers); //aktuelle bay auf Anfangskonfiguration gesetzt
 
         Params.s_info = new int [stacks][2];
         Params.c_info = new int[containers][4];
 
         Relocation.copy = new int[stacks][tiers][3];
-        while(!Params.sorted && solution_found) {
-            relocations_on_hold = new TreeSet<>();
-            step++;
-            relocation_count_current = Relocation.relocations_count;
+        while(!Params.sorted && solution_found) { //solange die bay nicht geordnet ist und eine Lösung gefunden werden kann, werden Umlagerungen vorgenommen
+            relocations_on_hold = new TreeSet<>(); //Umlagerungen auf Vorbehalt, falls sie wieder rückgängig gemacht werden müssen
+            step++; //nächster Algorithmusschritt
+            relocation_count_current = Relocation.relocations_count; //aktuelle Anzahl an UMlagerungen aktualisiert
             if (print_info) {
                 System.out.println("Step " + step);
                 System.out.println("Current bay: " + Arrays.deepToString(current_bay));
             }
 
-            Relocation.copy = BayInstance.copy_bay(current_bay, Relocation.copy, stacks, tiers);
+            Relocation.copy = BayInstance.copy_bay(current_bay, Relocation.copy, stacks, tiers); //Kopie der bay auf aktuelle bay gesetzt, Umlagerungen werden zunächst auf Kopie durchgeführt, um sie wieder rückgängig machen zu können
             int [][][] copy = Relocation.copy;
 
+            //Container- und Stapelinformationen werden berechnet
             Params.compute__c_info__s_info(copy, stacks, tiers);
 
-            //complete the high R stacks (Stacks, die geordnet sind und deren Höhe mindestens beta * h ist
+            //complete the high R stacks (Stapel, die geordnet sind und deren Höhe mindestens beta * h ist, werden versucht zu vervollständigen)
             Relocation_Huang.complete_high_R_stacks(copy, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
-            current_bay = BayInstance.copy_bay(Relocation.copy, current_bay, stacks, tiers);
+            current_bay = BayInstance.copy_bay(Relocation.copy, current_bay, stacks, tiers); //aktuelle bay mit Kopie gleichgesetzt, da bisherige Umlagerungen in jedem Fall final sind
             Params.check_sorted(stacks);
 
             relocations.addAll(relocations_on_hold); //relocations hinzufügen, da sonst auch die bisherigen zulässigen relocations gelöscht werden, wenn bei complete the low R stacks relocations rückgängig gemacht werden
 
-            //complete the low R stacks
+            //complete the low R stacks (Stapel, die geordnet sind und deren Höhe kleiner, als beta * h ist, werden versucht zu vervollständigen)
             if (!Params.sorted) {
                 Relocation_Huang.complete_low_R_stacks(copy, current_bay, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
             }
-            Params.check_sorted(stacks);
+            Params.check_sorted(stacks); //überprüfen, ob bereits sortiert
 
-            //deconstruct the low R stacks
+            //deconstruct the low R stacks ((Stapel, die geordnet sind und deren Höhe kleiner, als beta * h ist, werden abgebaut)
             if (!Params.sorted) {
                 Relocation_Huang.deconstruct_low_R_stacks(copy, current_bay, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
             }
-            Params.check_sorted(stacks);
+            Params.check_sorted(stacks); //überprüfen, ob bereits sortiert
 
             if (!Params.sorted) {
+                //nicht geordnete Blöcke sollen in leere Stapel umgelagert werden
                 Relocation_Huang.move_W_to_empty_stack(copy, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
             }
 
@@ -248,7 +261,7 @@ public class PreMarshalling {
             if (relocation_count_current == Relocation.relocations_count) {
                 Relocation_Huang.create_empty_stack(copy, Params.c_info, Params.s_info, stacks, stacks_per_bay, tiers, multiple_bays, consider_time);
             }
-            Params.check_sorted(stacks);
+            Params.check_sorted(stacks); //überprüfen, ob bereits sortiert
 
             current_bay = BayInstance.copy_bay(Relocation.copy, current_bay, stacks, tiers);
             relocations.addAll(relocations_on_hold);
@@ -280,8 +293,8 @@ public class PreMarshalling {
 
         Relocation_Jovanovic.deadlock = false;
         Relocation_Jovanovic.deadlock_next = new int[containers];
-        while(!Params.sorted && solution_found) {
-            relocations_on_hold = new TreeSet<>();
+        while(!Params.sorted && solution_found) { //solange die bay nicht geordnet ist und eine Lösung gefunden werden kann, werden Umlagerungen vorgenommen
+            relocations_on_hold = new TreeSet<>(); //Umlagerungen auf Vorbehalt, falls sie wieder rückgängig gemacht werden müssen
             step++;
             if (print_info) {
                 System.out.println("Step " + step);
@@ -304,6 +317,7 @@ public class PreMarshalling {
             Relocation_Jovanovic.same_stack_under = false;
             Relocation_Jovanovic.next_to_stopover_stack_prevent_deadlock = false;
 
+            //berechnet die Reihenfolge, in der Blöcke, welche die gewünschte Umlagerung von next blockieren, umgelagert werden sollen
             Relocation_Jovanovic.compute__order_relocations__same_stack_below_Jovanovic(copy, Params.c_info, Params.s_info, Params_Jovanovic.d_c, Params_Jovanovic.g_c_s, Params_Jovanovic.f_c_s, next);
             if (print_info) {
                 System.out.println("order_relocations: " + Arrays.toString(order_relocations));
@@ -328,7 +342,6 @@ public class PreMarshalling {
                 Relocation_Jovanovic.deadlock_count++;
                 Relocation.copy = BayInstance.copy_bay(current_bay, copy, stacks, tiers);
                 relocations_on_hold.clear();
-                //TODO: Relocation.relocations_count = relocations.size();
             }
 
             //filling
@@ -354,10 +367,10 @@ public class PreMarshalling {
     }
 
     private static void correction() {
+        //Achtung: durch Corrections werden die geschätzten Distanzen und Zeiten nicht angepasst
         Relocation last = new Relocation(0, 0, 0, 0, 0, 0);
         int number_relocations = relocations.size();
-        //Sicherstellen, dass relocation_count mit relocations.size() übereinstimmt
-        //TODO: Fehler finden
+        //Sicherstellen, dass relocation_count mit relocations.size() übereinstimmt, da diese inkonsistent sind
         int i = 1;
         for (Relocation r: relocations) {
             r.relocation_count = i;

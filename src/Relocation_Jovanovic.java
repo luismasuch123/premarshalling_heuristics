@@ -1,32 +1,30 @@
 import java.util.*;
 public class Relocation_Jovanovic {
 
-    static boolean same_stack;
-    static boolean same_stack_over;
-    static boolean same_stack_under;
-    static boolean next_to_stopover_stack_prevent_deadlock;
-    static int stopover_stack_prevent_deadlock;
-    static boolean deadlock = false;
-    static int deadlock_count;
+    static boolean same_stack; //true, falls next in den gleichen Stapel umgelagert werden sol, indem er sich befindet
+    static boolean same_stack_over; //true, falls same_stack = true und Blöcke über next liegen
+    static boolean same_stack_under; //true, falls same_stack = true und Blöcke unter next liegen
+    static boolean next_to_stopover_stack_prevent_deadlock; //true, falls same_stack = true und next zwischengelagert werden muss, um einen deadlock zu verhindern
+    static int stopover_stack_prevent_deadlock; //Stapel, in dem next zwischengelagert wird, um einen deadlock zu verhindern
+    static boolean deadlock = false; //true wenn deadlock nicht verhindert werden kann
+    static int deadlock_count; //Anzahl der deadlocks
     static int [] deadlock_next;
-    static int [] order_relocations;
-    static int [] selected_stacks;
-    static int [] same_stack_below;
+    static int [] order_relocations; //Reihenfolge, in welcher Blöcke, die next blockieren und nicht unter next liegen, umgelagert werden sollen
+    static int [] selected_stacks; //Stapel, in welche Blöcke, die next blockieren, umgelagert werden sollen
+    static int [] same_stack_below; //Reihenfolge, in welcher Blöcke, die next blockieren und unter next liegen, umgelagert werden sollen (nur im Fall, dass destination stack von next gleich seinem aktuellen stack ist)
 
     public static void relocate_next_Jovanovic(int [][][] copy, int next_block, int [][] c_info, int [][] s_info, int [] d_c, String stack_selection, boolean consider_time, boolean multiple_bays, int stacks, int tiers, int stacks_per_bay) {
         if (next_to_stopover_stack_prevent_deadlock) {
-            int block = next_block;
             int prio = c_info[next_block][2];
             int next_stack = stopover_stack_prevent_deadlock;
 
-            Relocation.relocate(c_info, s_info, block, prio, next_stack, tiers, stacks_per_bay, multiple_bays);
+            Relocation.relocate(c_info, s_info, next_block, prio, next_stack, tiers, stacks_per_bay, multiple_bays);
             next_to_stopover_stack_prevent_deadlock = false;
         } else if (!same_stack_under) {
-            int block = next_block;
             int prio = c_info[next_block][2];
             int next_stack = d_c[next_block];
 
-            Relocation.relocate(c_info, s_info, block, prio, next_stack, tiers, stacks_per_bay, multiple_bays);
+            Relocation.relocate(c_info, s_info, next_block, prio, next_stack, tiers, stacks_per_bay, multiple_bays);
         } else {
             //wenn s gleich ds und noch ein Block unter c umgelagert werden muss bevor c an Zielstelle gelangt, muss c erst in einen anderen Block
             //erst stack für below aussuchen, da c nur zu nächstem Stack sollte
@@ -271,7 +269,7 @@ public class Relocation_Jovanovic {
                     i++;
                 }
             }
-        } else {
+        } else { //falls der destination stack von next dem source stack entspricht, werden die benötigten Umlagerungen in order_relocations (blockierende Blöcke über next) und same_stack_under (blockierende Blöcke unter next) aufgeteilt, da dazwischen next umgelagert werden muss
             same_stack = true;
             order_relocations = new int[blocking_blocks_s];
             if (blocking_blocks_ds - blocking_blocks_s - 1 < 0) {
@@ -427,7 +425,19 @@ public class Relocation_Jovanovic {
                             stopover_stack_options.add(s);
                         }
                     }
-                    if (stopover_stack_options.size() == 1 || !consider_time) {
+                    if (stopover_stack_options.size() == 0) {
+                        //in vollem Stack einen PLatz freiräumen, um next zwischenzulagern
+                        for (int s = 0; s < stacks; s++) {
+                            if (s_info[s][0] == tiers-1) {
+                                stopover_stack_options.add(s);
+                            }
+                        }
+                        if(!consider_time) {
+                            stopover_stack_prevent_deadlock = stopover_stack_options.first();
+                        } else {
+                            stopover_stack_prevent_deadlock = Params.compute_nearest_stack(stopover_stack_options, tiers, stacks_per_bay, c_info[next_block][0], c_info[next_block][1], 0, s_info_help);
+                        }
+                    } else if (stopover_stack_options.size() == 1 || !consider_time) {
                         stopover_stack_prevent_deadlock = stopover_stack_options.first();
                     } else if (consider_time) {
                         stopover_stack_prevent_deadlock = Params.compute_nearest_stack(stopover_stack_options, tiers, stacks_per_bay, c_info[next_block][0], c_info[next_block][1], 0, s_info_help);

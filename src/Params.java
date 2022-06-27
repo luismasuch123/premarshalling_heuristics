@@ -48,7 +48,7 @@ public class Params {
                     bay_info[3 + empty_stacks_count][1] = -1;
                     empty_stacks_count++;
                 } else {
-                    //wenn zwei leere Stacks gefunden, kann es keine forced relocations geben -> fr_c_s dann uninteressant
+                    //wenn zwei leere Stacks gefunden, kann es keine forced relocations geben → fr_c_s dann uninteressant
                     break;
                 }
             }

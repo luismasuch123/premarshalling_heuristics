@@ -1,7 +1,6 @@
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.Scanner;
-import java.util.TreeSet;
 
 public class BayInstance {
 
@@ -35,9 +34,7 @@ public class BayInstance {
     public static int[][][] copy_bay(int[][][] initial_bay, int[][][] current_bay, int stacks, int tiers) {
         for(int s = 0; s < stacks; s++) {
             for (int t = 0; t < tiers; t++) {
-                for (int i = 0; i < 3; i++) {
-                    current_bay[s][t][i] = initial_bay[s][t][i];
-                }
+                System.arraycopy(initial_bay[s][t], 0, current_bay[s][t], 0, 3);
             }
         }
         return current_bay;

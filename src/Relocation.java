@@ -1,5 +1,4 @@
 import java.util.Arrays;
-import java.util.TreeSet;
 
 public class Relocation implements Comparable<Relocation> {
     int relocation_count;

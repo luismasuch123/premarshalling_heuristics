@@ -12,12 +12,12 @@ public class Relocation_Huang {
     static int next_stack_W_deconstruct;
     static int [] next_stack_R_low_checked;
     static boolean deconstruct_low_R_stack = false;
-    //create empyt_stack
+    //create empty_stack
     static int empty_stack;
     static int step_empty_stack;
 
     public static void complete_high_R_stacks(int [][][] copy, int [][] c_info, int[][] s_info, int stacks, int stacks_per_bay, int tiers, boolean multiple_bays, boolean consider_time) {
-        beta_h = beta * tiers;
+        beta_h = Math.ceil(beta * tiers);
         boolean next_stack_R_found = true;
         int [] next_stack_R_checked = new int [stacks];
 
@@ -156,7 +156,6 @@ public class Relocation_Huang {
                     Params.compute__c_info__s_info(copy, stacks, tiers);
                     //Wenn die relocations rückgängig gemacht werden, müssen sie auch aus relocations_on_hold gelöscht werden
                     PreMarshalling.relocations_on_hold.clear();
-                    //TODO: Relocation.relocations_count = PreMarshalling.relocations.size();
                 } else {
                     if (PreMarshalling.print_info) {
                         System.out.println("Next_stack_R " + next_stack_R + " does reach or exceed beta_h " + beta_h + ".");
@@ -172,12 +171,6 @@ public class Relocation_Huang {
 
     public static void deconstruct_low_R_stacks(int [][][] copy, int [][][] current_bay, int [][] c_info, int[][] s_info, int stacks, int stacks_per_bay, int tiers, boolean multiple_bays, boolean consider_time) {
         beta_h = beta * tiers;
-        /*
-        boolean next_stack_R_low_found = true;
-        next_stack_R_low_checked = new int [stacks];
-        deconstruct_low_R_stack = false;
-
-         */
 
         boolean next_stack_R_low_found = false;
         //verhindern, dass deconstructing bei allen low_R stacks nicht erfolgreich ist, sowie keine Umlagerungen stattfinden und im nächsten Durchgang erneut durchgeführt wird (loop)
@@ -440,7 +433,7 @@ public class Relocation_Huang {
     }
 
     public static void create_empty_stack(int[][][] copy, int[][] c_info, int[][] s_info, int stacks, int stacks_per_bay, int tiers, boolean multiple_bays, boolean consider_time) {
-        //wenn kein einzelner empty stack erzeugt werden kann, weil keine destination stacks mit prio <= prio von Block aus source vorhanden, dann Block aus source trotzdem umlagern
+        //wenn kein einzelner empty stack erzeugt werden kann, weil keine destination stacks mit prio ≤ prio von Block aus source vorhanden, dann Block aus source trotzdem umlagern
         boolean stack_source_found = true;
         boolean stack_destination_found = true;
         boolean all_W_stacks_exhausted = false;

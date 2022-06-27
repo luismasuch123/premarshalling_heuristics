@@ -12,9 +12,6 @@ public class Params_LB {
     static Set<Integer> Us = new HashSet<>(); //Set of stacks that would be upside down if one misoverlaying containers was removed. We assume U C Us.
     //LB_F
     static int groups; //number of different prio-groups //Gruppe fängt bei 0 an und keine Gruppen dürfen ausgelassen werden.
-    static int n_b; //number of badly placed items in L
-    static int [] n_b_s; //number of badly placed items in stack s
-    static int n_b_s_min;
     static int [][] n_g_s; //number of well placed items of all groups gs < g in stack s
     static int [] d_g; //number of all badly placed items of group g / demand of group g
     static int [] d_g_cum; //cumulative demand of group g
@@ -349,11 +346,6 @@ public class Params_LB {
                     g_top_s_help[s] = groups;
                 }
             }
-            //Hilfsarray, um bei Umlagerungen Anzahl der ungeordneten Blöcke in stack festzuhalten
-            int [] n_M_s_help = new int [stacks];
-            for (int s: S_M) {
-                n_M_s_help[s] = n_M_s[s];
-            }
             //Hilfsarray, um bei Umlagerungen Anzahl der Blöcke in stack festzuhalten
             int [] n_s_help = new int [stacks + n_s_gx];
             for (int s = 0; s < n_s_help.length; s++) {
@@ -396,7 +388,6 @@ public class Params_LB {
                     int source_stack = biggest_group_value_and_stack_misoverlaid_top[1];
                     int source_group = biggest_group_value_and_stack_misoverlaid_top[0];
                     //Updates durchführen
-                    n_M_s_help[source_stack]--;
                     n_s_help[source_stack]--;
                     n_s_help[destination_stack]++;
                     g_top_s_help[destination_stack] = source_group;
@@ -501,7 +492,7 @@ public class Params_LB {
                         }
                     }
                     if (condition_2) { //condition 2
-                        if (LB_F == IBF_0) { //condition 3 //TODO: IBF_1 == IBF_0 geht gar nicht, wenn case 2b, ergibt IBF_0 == LB_F mehr Sinn?
+                        if (LB_F == IBF_0) { //condition 3
                             boolean condition_4 = true;
                             int [] w_s_s = new int [stacks];
                             for (int sss = 0; sss < stacks; sss++) {
@@ -553,7 +544,7 @@ public class Params_LB {
                         w_ss_s_2 = w_s[s_2];
                     }
                 }
-                if (LB_F == IBF_0) { //condition 2 //TODO: IBF_1 == IBF_0 kann mit case_3 nicht true sein
+                if (LB_F == IBF_0) { //condition 2
                     boolean condition_3 = true;
                     for (int s: S_M) {
                         if (!(n_BG_s[s] > 2 || g_BG_si[s][0] > Math.max(w_ss_s_1, w_ss_s_2) || g_BG_si[s][1] > Math.min(w_ss_s_1, w_ss_s_2))) {
@@ -642,10 +633,10 @@ public class Params_LB {
 
     public static int compute__LB_F(int[][][] initial_bay, int [][] s_info, int stacks, int tiers) {
         compute__groups(initial_bay, s_info, stacks);
-        compute__n_g_s(initial_bay, s_info, stacks, tiers);
-        compute__d_g__d_g_cum(initial_bay, s_info, stacks, tiers);
+        compute__n_g_s(initial_bay, s_info, stacks);
+        compute__d_g__d_g_cum(initial_bay, s_info, stacks);
         compute__s_p_g__s_p_g_cum(initial_bay, s_info, stacks, tiers);
-        compute__d_s_g_cum(initial_bay, stacks, tiers);
+        compute__d_s_g_cum();
 
         return compute__n_m(stacks, tiers);
     }
@@ -657,8 +648,8 @@ public class Params_LB {
             n_bx = n_M;
         }
 
-        //TODO: muss n_s_gx += 1 bei d_s_g_cum_max[0] / tiers, da Rest besteht?
         n_s_gx = Math.max(0, d_s_g_cum_max[0] / tiers);
+        //n_s_gx += 1 bei d_s_g_cum_max[0] / tiers, wenn Rest besteht
         if (d_s_g_cum_max[0] % tiers > 0) {
             n_s_gx += 1;
         }
@@ -681,7 +672,7 @@ public class Params_LB {
         return n_bx + n_gx;
     }
 
-    private static void compute__d_s_g_cum(int[][][] initial_bay, int stacks, int tiers) {
+    private static void compute__d_s_g_cum() {
         d_s_g_cum = new int [groups];
         d_s_g_cum_max = new int [2];
         for (int g = 0; g < groups; g++) {
@@ -723,7 +714,7 @@ public class Params_LB {
 
     }
 
-    private static void compute__d_g__d_g_cum(int[][][] initial_bay, int [][] s_info, int stacks, int tiers) {
+    private static void compute__d_g__d_g_cum(int[][][] initial_bay, int [][] s_info, int stacks) {
         d_g = new int [groups];
         d_g_cum = new int [groups];
         for (int g = 0; g < groups; g++) {
@@ -756,7 +747,7 @@ public class Params_LB {
         }
     }
 
-    private static void compute__n_g_s(int [][][] initial_bay, int [][] s_info, int stacks, int tiers) {
+    private static void compute__n_g_s(int [][][] initial_bay, int [][] s_info, int stacks) {
 
         n_g_s = new int [groups][stacks];
         for (int g = 0; g < groups; g++) {
@@ -785,6 +776,7 @@ public class Params_LB {
                     for (int ss = 0; ss < stacks; ss++) {
                         if (s != ss) {
                             if (n_N_s[ss] + i <= tiers) {
+                                //die Stelle im stack finden, an welcher der Block richtig positioniert ist
                                 highest_tiers_to_move_blocking_containers_to.add(n_N_s[ss] + i + 1);
                             }
                         }
@@ -804,7 +796,6 @@ public class Params_LB {
         for (int s = 0; s < stacks; s++) {
             for (int t = n_s[s]; t > n_N_s[s]; t--) {
                 //Zeit, die mindestens aufgebracht werden muss, um ungeordneten Block umzulagern
-                //TODO: theoretisch könnte von jedem ungeordneten Block aus, die Zeit zum nächst möglichen Umlagerplatz aufsummiert werden
                 if (multiple_bays) {
                     lower_bound_time += 2 * PreMarshalling.speed_bays + (tiers - t + 1) * PreMarshalling.speed_tiers + (tiers - highest_tier_to_move_blocking_containers_to[s][n_s[s] - t] + 1) + 2 * PreMarshalling.speed_loading_unloading;
                 } else {
